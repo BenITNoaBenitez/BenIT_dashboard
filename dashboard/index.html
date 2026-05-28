@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>HERMES</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,14 +23,15 @@
       --warn: #f5a623;
       --err: #ff5570;
       --r: 16px;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
-    * { margin:0; padding:0; box-sizing:border-box; }
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
     html,body { height:100%; overflow:hidden; background:var(--bg); }
     body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:var(--text); }
 
     #cv { position:fixed; inset:0; width:100%; height:100%; z-index:0; }
 
-    /* logo center */
+    /* logo */
     #logo-center {
       position:fixed; z-index:5; pointer-events:none;
       top:50%; left:50%; transform:translate(-50%,-50%);
@@ -41,7 +42,9 @@
       filter:drop-shadow(0 0 14px rgba(0,232,122,0.35));
     }
 
-    /* ── GLASS PANEL ── */
+    /* ══════════════════════════════════
+       DESKTOP PANELS
+    ══════════════════════════════════ */
     .panel {
       position:fixed; z-index:30;
       background:rgba(11,11,11,0.84);
@@ -63,27 +66,25 @@
       font-size:9px; font-weight:500; letter-spacing:.14em;
       text-transform:uppercase; color:var(--text-3);
     }
-    .panel-body {
-      flex:1; overflow-y:auto; min-height:0;
-    }
+    .panel-body { flex:1; overflow-y:auto; min-height:0; }
     .panel-body::-webkit-scrollbar { width:2px; }
     .panel-body::-webkit-scrollbar-thumb { background:rgba(255,255,255,.06); }
 
-    /* resize grip */
     .resize-grip {
       position:absolute; bottom:0; right:0;
       width:14px; height:14px; cursor:se-resize; z-index:10;
       opacity:0.3; transition:opacity .15s;
     }
     .resize-grip:hover { opacity:0.7; }
-    .resize-grip::before, .resize-grip::after {
-      content:''; position:absolute; background:var(--text-3);
-      border-radius:1px;
+    .resize-grip::before,.resize-grip::after {
+      content:''; position:absolute; background:var(--text-3); border-radius:1px;
     }
     .resize-grip::before { width:8px; height:1px; bottom:4px; right:2px; }
     .resize-grip::after  { width:1px; height:8px; bottom:2px; right:4px; }
 
-    /* live dot */
+    /* ══════════════════════════════════
+       SHARED COMPONENTS
+    ══════════════════════════════════ */
     .live-dot {
       width:5px; height:5px; border-radius:50%;
       background:var(--accent); box-shadow:0 0 6px var(--accent);
@@ -91,17 +92,14 @@
     }
     @keyframes pulse-dot { 0%,100%{opacity:1}50%{opacity:.3} }
 
-    /* add btn */
     .add-btn {
       width:20px; height:20px; border-radius:6px;
       background:var(--surface-2); border:1px solid var(--border-2);
       color:var(--text-2); font-size:14px; line-height:1; cursor:pointer;
-      display:flex; align-items:center; justify-content:center;
-      transition:all .15s;
+      display:flex; align-items:center; justify-content:center; transition:all .15s;
     }
     .add-btn:hover { color:var(--accent); border-color:rgba(0,232,122,.3); }
 
-    /* ── LOG ENTRIES ── */
     .log-entry {
       display:flex; gap:6px; padding:3px 13px;
       font-size:10px; font-family:'SF Mono','JetBrains Mono',monospace;
@@ -115,7 +113,6 @@
     .log-entry.err  .log-msg { color:var(--err); }
     .log-entry.info .log-msg { color:rgba(0,232,122,.4); }
 
-    /* ── TASKS ── */
     .task-item {
       display:flex; align-items:flex-start; gap:8px;
       padding:5px 13px; font-size:11px; line-height:1.45;
@@ -131,25 +128,18 @@
     .task-status.done::after { content:''; width:4px; height:4px; background:#000; border-radius:50%; }
     .task-name { flex:1; color:var(--text-2); }
     .task-name.active { color:var(--text); font-weight:500; }
-    .task-badge {
-      font-size:9px; padding:1px 5px; border-radius:4px;
-      flex-shrink:0; font-weight:500; margin-top:1px;
-    }
+    .task-badge { font-size:9px; padding:1px 5px; border-radius:4px; flex-shrink:0; font-weight:500; margin-top:1px; }
     .tb-li  { background:rgba(0,140,255,.12); color:#60c0ff; }
     .tb-msg { background:rgba(124,58,237,.12); color:#a78bfa; }
     .tb-pst { background:rgba(0,232,122,.1); color:var(--accent); }
     .tb-con { background:rgba(245,166,35,.1); color:var(--warn); }
-    /* add form */
-    .task-form {
-      padding:0 10px 10px;
-      display:none; flex-direction:column; gap:6px; flex-shrink:0;
-    }
+
+    .task-form { padding:0 10px 10px; display:none; flex-direction:column; gap:6px; flex-shrink:0; }
     .task-form.open { display:flex; }
     .t-inp {
       background:rgba(255,255,255,.04); border:1px solid var(--border-2);
       border-radius:8px; padding:6px 10px; font-size:11px;
-      color:var(--text); font-family:inherit; outline:none;
-      transition:border-color .12s;
+      color:var(--text); font-family:inherit; outline:none; transition:border-color .12s;
     }
     .t-inp:focus { border-color:rgba(0,232,122,.3); }
     .t-inp::placeholder { color:var(--text-3); }
@@ -166,12 +156,7 @@
     }
     .t-submit:hover { background:rgba(0,232,122,.18); }
 
-    /* ── ROI ── */
     .roi-inner { padding:14px 16px; }
-    .roi-label {
-      font-size:9px; font-weight:500; letter-spacing:.12em;
-      text-transform:uppercase; color:var(--text-3); margin-bottom:10px;
-    }
     .roi-main {
       font-size:26px; font-weight:300; line-height:1;
       background:linear-gradient(135deg,var(--accent),#00c8a8);
@@ -183,7 +168,9 @@
     .roi-hrs { font-size:16px; font-weight:300; color:rgba(255,255,255,.5); }
     .roi-hrs-lbl { font-size:9px; color:var(--text-3); margin-top:2px; letter-spacing:.08em; text-transform:uppercase; }
 
-    /* ── BOTTOM NAV ── */
+    /* ══════════════════════════════════
+       DESKTOP BOTTOM BAR
+    ══════════════════════════════════ */
     .bottom-bar {
       position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
       display:flex; align-items:center; gap:10px; z-index:200;
@@ -216,7 +203,50 @@
       color:rgba(255,255,255,.45); white-space:nowrap; letter-spacing:.06em;
     }
 
-    /* ── SHEET ── */
+    /* ══════════════════════════════════
+       MOBILE HEADER
+    ══════════════════════════════════ */
+    .mob-header {
+      display:none;
+      position:fixed; top:0; left:0; right:0; z-index:200;
+      padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;
+      background:rgba(10,10,10,0.85);
+      backdrop-filter:blur(20px);
+      border-bottom:1px solid var(--border);
+      align-items:center; justify-content:space-between;
+    }
+    .mob-logo { height:28px; width:auto; opacity:.9; }
+    .mob-status { display:flex; align-items:center; gap:6px; }
+    .mob-clock { font-size:12px; font-weight:300; color:var(--text-2); letter-spacing:.04em; }
+
+    /* ══════════════════════════════════
+       MOBILE TAB BAR
+    ══════════════════════════════════ */
+    .mob-tabbar {
+      display:none;
+      position:fixed; bottom:0; left:0; right:0; z-index:200;
+      padding:8px 8px calc(var(--safe-bottom) + 8px);
+      background:rgba(10,10,10,0.92);
+      backdrop-filter:blur(24px);
+      border-top:1px solid var(--border);
+      justify-content:space-around; align-items:center;
+    }
+    .mob-tab {
+      display:flex; flex-direction:column; align-items:center; gap:3px;
+      padding:6px 10px; border-radius:10px; cursor:pointer;
+      background:transparent; border:none;
+      color:var(--text-3); font-family:inherit;
+      font-size:9px; font-weight:500; letter-spacing:.04em;
+      transition:all .15s; min-width:52px;
+    }
+    .mob-tab svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+    .mob-tab:active { transform:scale(.93); }
+    .mob-tab.active { color:var(--accent); }
+    .mob-tab.active svg { filter:drop-shadow(0 0 4px var(--accent)); }
+
+    /* ══════════════════════════════════
+       SHEETS (desktop + mobile)
+    ══════════════════════════════════ */
     .sheet {
       position:fixed; bottom:-100vh; left:50%; transform:translateX(-50%);
       width:min(700px,92vw); max-height:72vh;
@@ -225,7 +255,7 @@
       border:1px solid var(--border-2);
       border-radius:20px 20px 0 0;
       z-index:300; display:flex; flex-direction:column;
-      transition:bottom .3s cubic-bezier(0.32,0.72,0,1);
+      transition:bottom .32s cubic-bezier(0.32,0.72,0,1);
     }
     .sheet.open { bottom:0; }
     .sheet-handle {
@@ -238,18 +268,20 @@
     }
     .sheet-title { font-size:13px; font-weight:500; }
     .sheet-close {
-      width:24px; height:24px; border-radius:50%; border:none;
+      width:28px; height:28px; border-radius:50%; border:none;
       background:var(--surface-2); color:var(--text-2); cursor:pointer;
-      display:flex; align-items:center; justify-content:center; font-size:14px; transition:all .15s;
+      display:flex; align-items:center; justify-content:center; font-size:16px; transition:all .15s;
     }
     .sheet-close:hover { color:var(--text); }
-    .sheet-body { flex:1; overflow-y:auto; padding:16px 20px 24px; }
+    .sheet-body { flex:1; overflow-y:auto; padding:16px 20px 24px; -webkit-overflow-scrolling:touch; }
     .sheet-body::-webkit-scrollbar { width:3px; }
     .sheet-body::-webkit-scrollbar-thumb { background:var(--surface-2); border-radius:2px; }
     .s-label { font-size:9px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin-bottom:10px; margin-top:14px; }
     .s-label:first-child { margin-top:0; }
 
-    /* ── PROSPECT TABLE ── */
+    /* ══════════════════════════════════
+       PROSPECT TABLE
+    ══════════════════════════════════ */
     .p-search-row { display:flex; gap:8px; margin-bottom:14px; }
     .p-inp {
       flex:1; background:var(--surface); border:1px solid var(--border-2);
@@ -267,7 +299,7 @@
     .p-tbl { width:100%; border-collapse:collapse; font-size:11px; }
     .p-tbl thead { background:rgba(255,255,255,.02); }
     .p-tbl th { padding:8px 14px; text-align:left; font-size:9px; font-weight:500; color:var(--text-3); text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid var(--border); }
-    .p-tbl td { padding:8px 14px; border-bottom:1px solid rgba(255,255,255,.03); color:var(--text); vertical-align:middle; }
+    .p-tbl td { padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.03); color:var(--text); vertical-align:middle; }
     .p-tbl tr:last-child td { border-bottom:none; }
     .p-tbl tbody tr:hover td { background:var(--surface); cursor:pointer; }
     .sbadge { font-size:10px; padding:2px 8px; border-radius:5px; font-weight:500; white-space:nowrap; }
@@ -278,17 +310,19 @@
     .s-ghost { background:rgba(255,255,255,.04); color:var(--text-3); }
 
     /* linkedin */
-    .li-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .li-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
     .li-lbl { width:100px; font-size:11px; color:var(--text-2); flex-shrink:0; }
     .li-bar { flex:1; height:2px; background:rgba(255,255,255,.06); border-radius:1px; overflow:hidden; }
     .li-fill { height:100%; border-radius:1px; transition:width .5s ease; }
     .li-val { width:55px; text-align:right; font-size:11px; color:var(--text-2); }
-    .bl-item { display:flex; align-items:center; justify-content:space-between; padding:7px 10px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:5px; font-size:11px; color:var(--text-2); }
-    .bl-rm { background:transparent; border:none; color:var(--err); cursor:pointer; font-size:11px; opacity:.5; transition:opacity .1s; }
+    .bl-item { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:6px; font-size:11px; color:var(--text-2); }
+    .bl-rm { background:transparent; border:none; color:var(--err); cursor:pointer; font-size:11px; opacity:.5; transition:opacity .1s; padding:4px; }
     .bl-rm:hover { opacity:1; }
     .bl-inp-row { display:flex; gap:6px; margin-bottom:10px; }
 
-    /* ── PROSPECT SLIDE ── */
+    /* ══════════════════════════════════
+       PROSPECT SLIDE
+    ══════════════════════════════════ */
     .pslide {
       position:fixed; top:0; right:-420px; width:420px; height:100vh;
       background:rgba(11,11,11,.97); backdrop-filter:blur(28px);
@@ -307,15 +341,16 @@
     .tl-line { position:absolute; left:3px; top:11px; width:1px; height:calc(100% - 3px); background:var(--border); }
     .tl-txt { font-size:12px; color:var(--text-2); line-height:1.55; }
 
-    /* ── KNOWLEDGE POPUP ── */
+    /* ══════════════════════════════════
+       KNOWLEDGE POPUP
+    ══════════════════════════════════ */
     .kn-popup {
       position:fixed; top:50%; left:50%; z-index:400;
       transform:translate(-50%,-50%) scale(0.95);
       width:520px; max-height:74vh;
       background:rgba(12,12,12,.98);
       backdrop-filter:blur(36px) saturate(200%);
-      border:1px solid var(--border-2);
-      border-radius:20px;
+      border:1px solid var(--border-2); border-radius:20px;
       opacity:0; pointer-events:none;
       display:flex; flex-direction:column;
       transition:opacity .2s, transform .22s cubic-bezier(0.34,1.4,0.64,1);
@@ -328,11 +363,10 @@
     }
     .kn-dots { display:flex; gap:6px; }
     .kd { width:12px; height:12px; border-radius:50%; cursor:pointer; }
-    .kd-r { background:#ff5f57; } .kd-y { background:#ffbd2e; } .kd-g { background:#28ca41; }
+    .kd-r{background:#ff5f57;} .kd-y{background:#ffbd2e;} .kd-g{background:#28ca41;}
     .kn-popup-title { flex:1; text-align:center; font-size:12px; font-weight:500; color:var(--text-2); }
-    .kn-popup-body { flex:1; overflow-y:auto; padding:16px 20px 20px; }
+    .kn-popup-body { flex:1; overflow-y:auto; padding:16px 20px 20px; -webkit-overflow-scrolling:touch; }
     .kn-popup-body::-webkit-scrollbar { width:3px; }
-    .kn-popup-body::-webkit-scrollbar-thumb { background:var(--surface-2); }
     .kn-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:14px; }
     .kn-tab {
       padding:4px 10px; border-radius:8px; font-size:10px; font-weight:500;
@@ -358,8 +392,54 @@
     .md-body table td { padding:4px 8px; border:1px solid var(--border); color:var(--text-2); }
 
     /* overlay */
-    .overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:250; display:none; backdrop-filter:blur(2px); }
+    .overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:250; display:none; backdrop-filter:blur(2px); }
     .overlay.on { display:block; }
+
+    /* ══════════════════════════════════
+       MOBILE OVERRIDES  ≤ 768px
+    ══════════════════════════════════ */
+    @media (max-width: 768px) {
+      /* show mobile chrome */
+      .mob-header  { display:flex; }
+      .mob-tabbar  { display:flex; }
+
+      /* hide desktop chrome */
+      .bottom-bar  { display:none; }
+      .panel       { display:none !important; }
+
+      /* logo smaller on mobile */
+      #logo-center img { width:100px; }
+
+      /* sheets full-width, taller */
+      .sheet {
+        width:100vw;
+        max-height:82vh;
+        border-radius:20px 20px 0 0;
+      }
+      /* account for tab bar height */
+      .sheet.open { bottom:calc(58px + var(--safe-bottom)); }
+
+      /* knowledge popup full-screen on mobile */
+      .kn-popup {
+        width:100vw; max-height:92vh;
+        top:auto; left:0; bottom:-100vh;
+        transform:none;
+        border-radius:20px 20px 0 0;
+        transition:opacity .2s, bottom .3s cubic-bezier(0.32,0.72,0,1);
+      }
+      .kn-popup.open {
+        bottom:0; opacity:1; transform:none;
+      }
+
+      /* prospect slide full-width on mobile */
+      .pslide { width:100vw; right:-100vw; }
+
+      /* bigger tap targets in table */
+      .p-tbl td { padding:12px 14px; }
+
+      /* markdown */
+      .md-body { font-size:13px; }
+    }
 
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important}}
   </style>
@@ -368,12 +448,21 @@
 
 <canvas id="cv"></canvas>
 
-<!-- Logo centered on sphere -->
+<!-- logo centered on sphere -->
 <div id="logo-center">
   <img src="logo.png" alt="HERMES" />
 </div>
 
-<!-- ── PANEL: Logs ── -->
+<!-- ══ MOBILE HEADER ══ -->
+<header class="mob-header" id="mob-header">
+  <img src="logo.png" alt="HERMES" class="mob-logo" />
+  <div class="mob-status">
+    <div class="srv-dot" id="srv-dot-mob"></div>
+    <span class="mob-clock" id="clock-mob">--:--</span>
+  </div>
+</header>
+
+<!-- ══ DESKTOP PANELS ══ -->
 <div class="panel" id="panel-logs">
   <div class="panel-bar" id="bar-logs">
     <span class="panel-title">Live Logs</span>
@@ -383,7 +472,6 @@
   <div class="resize-grip" id="rg-logs"></div>
 </div>
 
-<!-- ── PANEL: Tasks ── -->
 <div class="panel" id="panel-tasks">
   <div class="panel-bar" id="bar-tasks">
     <span class="panel-title">Tâches</span>
@@ -405,7 +493,6 @@
   <div class="resize-grip" id="rg-tasks"></div>
 </div>
 
-<!-- ── PANEL: ROI ── -->
 <div class="panel" id="panel-roi">
   <div class="panel-bar" id="bar-roi">
     <span class="panel-title">ROI en direct</span>
@@ -422,7 +509,7 @@
   <div class="resize-grip" id="rg-roi"></div>
 </div>
 
-<!-- ── BOTTOM NAV ── -->
+<!-- ══ DESKTOP BOTTOM BAR ══ -->
 <div class="bottom-bar">
   <div class="status-glass">
     <div class="srv-dot" id="srv-dot"></div>
@@ -435,7 +522,82 @@
   <div class="clock-glass" id="clock">--:--:--</div>
 </div>
 
-<!-- ── SHEET: Prospects ── -->
+<!-- ══ MOBILE TAB BAR ══ -->
+<nav class="mob-tabbar" id="mob-tabbar">
+  <button class="mob-tab" id="mtab-logs" onclick="mobTab('logs')">
+    <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+    Logs
+  </button>
+  <button class="mob-tab" id="mtab-tasks" onclick="mobTab('tasks')">
+    <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1" fill="currentColor"/><circle cx="3" cy="12" r="1" fill="currentColor"/><circle cx="3" cy="18" r="1" fill="currentColor"/></svg>
+    Tâches
+  </button>
+  <button class="mob-tab" id="mtab-roi" onclick="mobTab('roi')">
+    <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    ROI
+  </button>
+  <button class="mob-tab" id="mtab-prospects" onclick="toggleSheet('prospects')">
+    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Prospects
+  </button>
+  <button class="mob-tab" id="mtab-linkedin" onclick="toggleSheet('linkedin')">
+    <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="4"/><path d="M7 10v7M7 7v.01M12 10v7M12 13a3 3 0 0 1 5 2v2"/></svg>
+    LinkedIn
+  </button>
+</nav>
+
+<!-- ══ MOBILE SHEETS (Logs / Tasks / ROI) ══ -->
+<div class="sheet" id="sheet-logs">
+  <div class="sheet-handle" onclick="closeMobSheet('logs')"></div>
+  <div class="sheet-hdr">
+    <span class="sheet-title">Live Logs</span>
+    <button class="sheet-close" onclick="closeMobSheet('logs')">×</button>
+  </div>
+  <div class="sheet-body" id="mob-log-body"></div>
+</div>
+
+<div class="sheet" id="sheet-tasks">
+  <div class="sheet-handle" onclick="closeMobSheet('tasks')"></div>
+  <div class="sheet-hdr">
+    <span class="sheet-title">Tâches</span>
+    <button class="sheet-close" onclick="closeMobSheet('tasks')">×</button>
+  </div>
+  <div class="sheet-body">
+    <div id="mob-task-body"></div>
+    <div style="padding:12px 0 0">
+      <button class="t-submit" style="width:100%" onclick="toggleMobAddForm()">+ Ajouter une tâche</button>
+    </div>
+    <div class="task-form" id="mob-task-form" style="padding:10px 0 0">
+      <input id="mob-tfi-title" class="t-inp" placeholder="Décrire la tâche…" onkeydown="if(event.key==='Enter')addTaskMob()" />
+      <div class="t-row">
+        <select id="mob-tfi-type" class="t-sel">
+          <option value="li">LinkedIn</option><option value="msg">Message</option>
+          <option value="pst">Post</option><option value="con">Connexion</option>
+        </select>
+        <button class="t-submit" onclick="addTaskMob()">Ajouter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet-roi">
+  <div class="sheet-handle" onclick="closeMobSheet('roi')"></div>
+  <div class="sheet-hdr">
+    <span class="sheet-title">ROI en direct</span>
+    <button class="sheet-close" onclick="closeMobSheet('roi')">×</button>
+  </div>
+  <div class="sheet-body">
+    <div style="padding:8px 0 20px">
+      <div style="font-size:42px;font-weight:300;background:linear-gradient(135deg,var(--accent),#00c8a8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px" id="roi-val-mob">14 800€</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:20px">valeur générée</div>
+      <div style="height:1px;background:var(--border);margin-bottom:20px"></div>
+      <div style="font-size:28px;font-weight:300;color:rgba(255,255,255,.55)" id="roi-hrs-mob">52.00h</div>
+      <div style="font-size:10px;color:var(--text-3);margin-top:4px;letter-spacing:.08em;text-transform:uppercase">heures économisées</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DESKTOP + SHARED SHEETS ══ -->
 <div class="sheet" id="sheet-prospects">
   <div class="sheet-handle" onclick="toggleSheet('prospects')"></div>
   <div class="sheet-hdr">
@@ -458,7 +620,6 @@
   </div>
 </div>
 
-<!-- ── SHEET: LinkedIn ── -->
 <div class="sheet" id="sheet-linkedin">
   <div class="sheet-handle" onclick="toggleSheet('linkedin')"></div>
   <div class="sheet-hdr">
@@ -477,7 +638,7 @@
   </div>
 </div>
 
-<!-- ── PROSPECT SLIDE ── -->
+<!-- ══ PROSPECT SLIDE ══ -->
 <div class="overlay" id="overlay" onclick="closeSlide()"></div>
 <div class="pslide" id="pslide">
   <div class="pslide-hdr">
@@ -487,13 +648,12 @@
   <div class="pslide-body" id="sl-body"></div>
 </div>
 
-<!-- ── KNOWLEDGE POPUP ── -->
+<!-- ══ KNOWLEDGE POPUP ══ -->
 <div class="kn-popup" id="kn-popup">
   <div class="kn-popup-hdr">
     <div class="kn-dots">
       <div class="kd kd-r" onclick="closeKnPopup()"></div>
-      <div class="kd kd-y"></div>
-      <div class="kd kd-g"></div>
+      <div class="kd kd-y"></div><div class="kd kd-g"></div>
     </div>
     <div class="kn-popup-title" id="kn-popup-title">Knowledge</div>
   </div>
@@ -552,386 +712,286 @@ const DATA = {
 
 const STATE = {
   logs:[
-    {ts:'14:23:01',ag:'LinkedIn',act:'Like post · Marie Curie',          st:'ok'},
-    {ts:'14:22:45',ag:'Système', act:"Cycle d'activité démarré",         st:'info'},
-    {ts:'14:18:44',ag:'LinkedIn',act:'Commentaire · Tech Leaders',       st:'ok'},
-    {ts:'14:15:02',ag:'LinkedIn',act:'Rate limit — pause 3 min',         st:'warn'},
-    {ts:'14:10:32',ag:'Message', act:'Message envoyé · Jean-Paul',       st:'ok'},
-    {ts:'13:58:17',ag:'LinkedIn',act:'Connexion · Sophie Lambert',       st:'ok'},
-    {ts:'13:45:02',ag:'LinkedIn',act:'Tentative like — post supprimé',   st:'warn'},
-    {ts:'12:40:05',ag:'Message', act:'ERREUR : profil privé · Leroy',    st:'err'},
-    {ts:'12:22:59',ag:'LinkedIn',act:'Like post · Scale-up Stories',     st:'ok'},
-    {ts:'12:20:14',ag:'Système', act:'Check quota journalier : OK',      st:'info'},
+    {ts:'14:23:01',ag:'LinkedIn',act:'Like post · Marie Curie',        st:'ok'},
+    {ts:'14:22:45',ag:'Système', act:"Cycle d'activité démarré",       st:'info'},
+    {ts:'14:18:44',ag:'LinkedIn',act:'Commentaire · Tech Leaders',     st:'ok'},
+    {ts:'14:15:02',ag:'LinkedIn',act:'Rate limit — pause 3 min',       st:'warn'},
+    {ts:'14:10:32',ag:'Message', act:'Message envoyé · Jean-Paul',     st:'ok'},
+    {ts:'13:58:17',ag:'LinkedIn',act:'Connexion · Sophie Lambert',     st:'ok'},
+    {ts:'13:45:02',ag:'LinkedIn',act:'Tentative like — post supprimé', st:'warn'},
+    {ts:'12:40:05',ag:'Message', act:'ERREUR : profil privé · Leroy',  st:'err'},
+    {ts:'12:22:59',ag:'LinkedIn',act:'Like post · Scale-up Stories',   st:'ok'},
+    {ts:'12:20:14',ag:'Système', act:'Check quota journalier : OK',    st:'info'},
   ],
   blacklist:JSON.parse(localStorage.getItem('hm_bl')||'null')||['Robert Schneider · Concurrent','Marketing Auto · Bot'],
   activeKnFile:'k-out',
   openSheets:{},
+  openMobSheets:{},
   prospectSearch:'', prospectFilter:'',
 };
 
+const isMobile = () => window.innerWidth <= 768;
+
 // ═══════════════════════════════════════
-// CANVAS + SPHERE GRAPH
+// CANVAS + SPHERE
 // ═══════════════════════════════════════
 const cv  = document.getElementById('cv');
 const ctx = cv.getContext('2d');
-let W=0, H=0, SR=0; // SR = sphere radius
-const TAU = Math.PI * 2;
+let W=0, H=0, SR=0;
+const TAU = Math.PI*2;
 
-// Knowledge nodes — positioned on sphere surface
 const KN = [
-  // File nodes (larger, interactive)
-  {id:'k-out',label:'Outbound',     type:'file',    theta0:0,              phi0:0.20,  color:'#00e87a'},
-  {id:'k-in', label:'Inbound',      type:'file',    theta0:Math.PI*0.5,   phi0:-0.28, color:'#34d399'},
-  {id:'k-com',label:'Commentaires', type:'file',    theta0:Math.PI,        phi0:0.32,  color:'#6ee7b7'},
-  {id:'k-sty',label:'Style',        type:'file',    theta0:Math.PI*1.5,   phi0:-0.20, color:'#a7f3d0'},
-  // Concept nodes (smaller)
-  {id:'c-li', label:'LinkedIn',     type:'concept', theta0:Math.PI*0.22,  phi0:0.58,  color:'#60c0ff'},
-  {id:'c-msg',label:'Messages',     type:'concept', theta0:Math.PI*0.72,  phi0:-0.52, color:'#a78bfa'},
-  {id:'c-kpi',label:'KPIs',         type:'concept', theta0:Math.PI*1.22,  phi0:0.48,  color:'#f5a623'},
-  {id:'c-cnt',label:'Contenu',      type:'concept', theta0:Math.PI*1.72,  phi0:-0.48, color:'#fb923c'},
-  {id:'c-cib',label:'Ciblage',      type:'concept', theta0:Math.PI*0.44,  phi0:-0.62, color:'#f472b6'},
-  {id:'c-eng',label:'Engagement',   type:'concept', theta0:Math.PI*0.97,  phi0:0.64,  color:'#e879f9'},
-  {id:'c-seq',label:'Séquence',     type:'concept', theta0:Math.PI*1.47,  phi0:0.12,  color:'#818cf8'},
+  {id:'k-out',label:'Outbound',    type:'file',   theta0:0,           phi0:0.20,  color:'#00e87a'},
+  {id:'k-in', label:'Inbound',     type:'file',   theta0:Math.PI*.5,  phi0:-0.28, color:'#34d399'},
+  {id:'k-com',label:'Commentaires',type:'file',   theta0:Math.PI,     phi0:0.32,  color:'#6ee7b7'},
+  {id:'k-sty',label:'Style',       type:'file',   theta0:Math.PI*1.5, phi0:-0.20, color:'#a7f3d0'},
+  {id:'c-li', label:'LinkedIn',    type:'concept',theta0:Math.PI*.22, phi0:0.58,  color:'#60c0ff'},
+  {id:'c-msg',label:'Messages',    type:'concept',theta0:Math.PI*.72, phi0:-0.52, color:'#a78bfa'},
+  {id:'c-kpi',label:'KPIs',        type:'concept',theta0:Math.PI*1.22,phi0:0.48,  color:'#f5a623'},
+  {id:'c-cnt',label:'Contenu',     type:'concept',theta0:Math.PI*1.72,phi0:-0.48, color:'#fb923c'},
+  {id:'c-cib',label:'Ciblage',     type:'concept',theta0:Math.PI*.44, phi0:-0.62, color:'#f472b6'},
+  {id:'c-eng',label:'Engagement',  type:'concept',theta0:Math.PI*.97, phi0:0.64,  color:'#e879f9'},
+  {id:'c-seq',label:'Séquence',    type:'concept',theta0:Math.PI*1.47,phi0:0.12,  color:'#818cf8'},
 ];
-
-const KE = [
+const KE=[
   {s:'k-out',t:'c-li'},{s:'k-out',t:'c-msg'},{s:'k-out',t:'c-kpi'},{s:'k-out',t:'c-cib'},{s:'k-out',t:'c-seq'},
-  {s:'k-in', t:'c-li'},{s:'k-in', t:'c-cnt'},{s:'k-in', t:'c-kpi'},{s:'k-in', t:'c-eng'},
+  {s:'k-in',t:'c-li'},{s:'k-in',t:'c-cnt'},{s:'k-in',t:'c-kpi'},{s:'k-in',t:'c-eng'},
   {s:'k-com',t:'c-li'},{s:'k-com',t:'c-cnt'},{s:'k-com',t:'c-eng'},
   {s:'k-sty',t:'c-msg'},{s:'k-sty',t:'c-cnt'},
   {s:'k-out',t:'k-in'},{s:'k-in',t:'k-com'},{s:'k-com',t:'k-sty'},
 ];
-
-// Fibonacci sphere texture dots (purely visual, 90 dots scattered on sphere)
-const TEXTURE = (() => {
-  const pts = [];
-  const golden = Math.PI * (1 + Math.sqrt(5));
-  for (let i = 0; i < 90; i++) {
-    const phi = Math.acos(1 - 2*(i+0.5)/90) - Math.PI/2;
-    const theta = golden * i;
-    pts.push({theta0: theta, phi0: phi});
-  }
+const TEXTURE=(()=>{
+  const pts=[]; const g=Math.PI*(1+Math.sqrt(5));
+  for(let i=0;i<90;i++) pts.push({theta0:g*i, phi0:Math.acos(1-2*(i+.5)/90)-Math.PI/2});
   return pts;
 })();
 
-let rotY = 0, hovNode = null;
+let rotY=0, hovNode=null;
 
-function project(theta, phi) {
-  const th = theta + rotY;
-  const x3 = Math.cos(th) * Math.cos(phi);
-  const y3 = Math.sin(phi);
-  const z3 = Math.sin(th) * Math.cos(phi);
-  // perspective
-  const fov = 2.6, zOff = 2.6;
-  const sc = fov / (zOff - z3 * 0.45);
-  return {
-    px: W/2 + x3 * SR * sc,
-    py: H/2 - y3 * SR * 0.9 * sc, // slight vertical compression
-    depth: z3,
-    vis: (z3 + 1) / 2,
-    sc
-  };
+function project(theta,phi){
+  const th=theta+rotY;
+  const x3=Math.cos(th)*Math.cos(phi), y3=Math.sin(phi), z3=Math.sin(th)*Math.cos(phi);
+  const fov=2.6,zOff=2.6, sc=fov/(zOff-z3*.45);
+  // sphere center: on mobile offset up slightly to avoid tab bar
+  const cy0 = isMobile() ? H*0.42 : H/2;
+  return {px:W/2+x3*SR*sc, py:cy0-y3*SR*.9*sc, depth:z3, vis:(z3+1)/2, sc};
 }
 
-function updateKN() {
-  rotY += 0.0018;
-  KN.forEach(n => {
-    const p = project(n.theta0, n.phi0);
-    n.px = p.px; n.py = p.py;
-    n.depth = p.depth; n.vis = p.vis;
-    n.baseR = n.type === 'file' ? 9 : 5.5;
-    n.screenR = n.baseR * (0.55 + n.vis * 0.45);
+function updateKN(){
+  rotY+=0.0018;
+  KN.forEach(n=>{
+    const p=project(n.theta0,n.phi0);
+    n.px=p.px; n.py=p.py; n.depth=p.depth; n.vis=p.vis;
+    n.baseR=n.type==='file'?9:5.5;
+    n.screenR=n.baseR*(0.55+n.vis*.45);
   });
-  KN.sort((a,b) => a.depth - b.depth);
+  KN.sort((a,b)=>a.depth-b.depth);
 }
 
-function drawSphere() {
-  const cx=W/2, cy=H/2;
+function drawSphere(){
+  const cx=W/2, cy0=isMobile()?H*.42:H/2;
+  const og=ctx.createRadialGradient(cx,cy0,SR*.75,cx,cy0,SR*1.35);
+  og.addColorStop(0,'transparent'); og.addColorStop(.5,'rgba(0,232,122,0.025)'); og.addColorStop(1,'transparent');
+  ctx.beginPath(); ctx.arc(cx,cy0,SR*1.35,0,TAU); ctx.fillStyle=og; ctx.fill();
 
-  // Outer glow
-  const og = ctx.createRadialGradient(cx, cy, SR*0.75, cx, cy, SR*1.35);
-  og.addColorStop(0, 'transparent');
-  og.addColorStop(0.5, 'rgba(0,232,122,0.025)');
-  og.addColorStop(1, 'transparent');
-  ctx.beginPath(); ctx.arc(cx,cy,SR*1.35,0,TAU);
-  ctx.fillStyle=og; ctx.fill();
+  const bg=ctx.createRadialGradient(cx-SR*.25,cy0-SR*.25,SR*.05,cx,cy0,SR);
+  bg.addColorStop(0,'rgba(20,20,20,0.22)'); bg.addColorStop(.6,'rgba(12,12,12,0.14)');
+  bg.addColorStop(.88,'rgba(7,7,7,0.08)'); bg.addColorStop(1,'rgba(0,232,122,0.035)');
+  ctx.beginPath(); ctx.arc(cx,cy0,SR,0,TAU); ctx.fillStyle=bg; ctx.fill();
 
-  // Sphere body — very subtle dark gradient
-  const bg = ctx.createRadialGradient(cx-SR*0.25, cy-SR*0.25, SR*0.05, cx, cy, SR);
-  bg.addColorStop(0,   'rgba(20,20,20,0.22)');
-  bg.addColorStop(0.6, 'rgba(12,12,12,0.14)');
-  bg.addColorStop(0.88,'rgba(7,7,7,0.08)');
-  bg.addColorStop(1,   'rgba(0,232,122,0.035)');
-  ctx.beginPath(); ctx.arc(cx,cy,SR,0,TAU);
-  ctx.fillStyle=bg; ctx.fill();
-
-  // Sphere edge stroke
-  ctx.beginPath(); ctx.arc(cx,cy,SR,0,TAU);
+  ctx.beginPath(); ctx.arc(cx,cy0,SR,0,TAU);
   ctx.strokeStyle='rgba(0,232,122,0.10)'; ctx.lineWidth=1.2; ctx.stroke();
 
-  // Latitude rings (clipped to sphere interior)
-  ctx.save();
-  ctx.beginPath(); ctx.arc(cx,cy,SR,0,TAU); ctx.clip();
+  ctx.save(); ctx.beginPath(); ctx.arc(cx,cy0,SR,0,TAU); ctx.clip();
   ctx.strokeStyle='rgba(255,255,255,0.025)'; ctx.lineWidth=0.6;
-  [-0.5236,-0.2618,0,0.2618,0.5236].forEach(lat => { // -30,-15,0,15,30 deg
-    const p = project(0, lat);
-    const cosLat = Math.cos(lat);
-    const rx = SR * cosLat * (2.6/(2.6 - 0*0.45)); // approx equatorial scale
-    const ry = rx * 0.9 * cosLat * 0.5;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy - Math.sin(lat)*SR*0.9, rx * 0.92, ry * 0.35, 0, 0, TAU);
-    ctx.stroke();
+  [-0.5236,-0.2618,0,0.2618,0.5236].forEach(lat=>{
+    const cosLat=Math.cos(lat), rx=SR*cosLat*.92, ry=rx*.35;
+    const yOff=cy0-Math.sin(lat)*SR*.9;
+    ctx.beginPath(); ctx.ellipse(cx,yOff,rx,ry,0,0,TAU); ctx.stroke();
   });
   ctx.restore();
 
-  // Texture dots (Fibonacci sphere)
-  TEXTURE.forEach(t => {
-    const p = project(t.theta0, t.phi0);
-    if (p.vis < 0.05) return;
-    const alpha = p.vis * 0.18;
-    ctx.beginPath(); ctx.arc(p.px, p.py, 1.2 * (0.4 + p.vis*0.6), 0, TAU);
-    ctx.fillStyle = `rgba(0,232,122,${alpha.toFixed(3)})`; ctx.fill();
+  TEXTURE.forEach(t=>{
+    const p=project(t.theta0,t.phi0);
+    if(p.vis<0.05) return;
+    ctx.beginPath(); ctx.arc(p.px,p.py,1.2*(0.4+p.vis*.6),0,TAU);
+    ctx.fillStyle=`rgba(0,232,122,${(p.vis*.18).toFixed(3)})`; ctx.fill();
   });
 }
 
-function drawKNEdges() {
-  for (const e of KE) {
-    const a = KN.find(n=>n.id===e.s), b = KN.find(n=>n.id===e.t);
-    if (!a||!b) continue;
-    const minVis = Math.min(a.vis, b.vis);
-    if (minVis < 0.05) continue;
-    const alpha = minVis * 0.22;
-    const hA = hovNode && (hovNode.id===a.id||hovNode.id===b.id);
-    ctx.beginPath(); ctx.moveTo(a.px,a.py); ctx.lineTo(b.px,b.py);
-    ctx.strokeStyle = hA ? `rgba(0,232,122,${(alpha*2.5).toFixed(2)})` : `rgba(0,232,122,${alpha.toFixed(2)})`;
-    ctx.lineWidth = hA ? 1.2 : 0.6;
-    ctx.stroke();
+function hexAlpha(hex,a){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${Math.max(0,Math.min(1,a)).toFixed(2)})`;
+}
 
-    // Particle on edge
-    const prog = ((rotY * 0.7 + KE.indexOf(e) * 0.3) % 1 + 1) % 1;
-    const px = a.px + (b.px-a.px)*prog;
-    const py = a.py + (b.py-a.py)*prog;
-    ctx.beginPath(); ctx.arc(px,py,1.4,0,TAU);
-    ctx.fillStyle=`rgba(0,232,122,${(minVis*0.45).toFixed(2)})`; ctx.fill();
+function drawKNEdges(){
+  for(const e of KE){
+    const a=KN.find(n=>n.id===e.s),b=KN.find(n=>n.id===e.t);
+    if(!a||!b) continue;
+    const mv=Math.min(a.vis,b.vis); if(mv<0.05) continue;
+    const hA=hovNode&&(hovNode.id===a.id||hovNode.id===b.id);
+    ctx.beginPath(); ctx.moveTo(a.px,a.py); ctx.lineTo(b.px,b.py);
+    ctx.strokeStyle=`rgba(0,232,122,${(hA?mv*.55:mv*.22).toFixed(2)})`;
+    ctx.lineWidth=hA?1.2:0.6; ctx.stroke();
+    const prog=((rotY*.7+KE.indexOf(e)*.3)%1+1)%1;
+    ctx.beginPath(); ctx.arc(a.px+(b.px-a.px)*prog,a.py+(b.py-a.py)*prog,1.4,0,TAU);
+    ctx.fillStyle=`rgba(0,232,122,${(mv*.45).toFixed(2)})`; ctx.fill();
   }
 }
 
-function drawKNNodes() {
-  for (const n of KN) {
-    if (n.vis < 0.04) continue;
-    const isHov = hovNode && hovNode.id===n.id;
-    const isFile = n.type==='file';
-
-    // Glow
-    if (isFile && n.vis > 0.35) {
-      const gr = ctx.createRadialGradient(n.px,n.py,0,n.px,n.py,n.screenR+20);
-      gr.addColorStop(0, hexAlpha(n.color, n.vis * (isHov?0.55:0.28)));
-      gr.addColorStop(1, 'transparent');
-      ctx.beginPath(); ctx.arc(n.px,n.py,n.screenR+20,0,TAU);
-      ctx.fillStyle=gr; ctx.fill();
+function drawKNNodes(){
+  for(const n of KN){
+    if(n.vis<0.04) continue;
+    const isHov=hovNode&&hovNode.id===n.id, isFile=n.type==='file';
+    if(isFile&&n.vis>.35){
+      const gr=ctx.createRadialGradient(n.px,n.py,0,n.px,n.py,n.screenR+20);
+      gr.addColorStop(0,hexAlpha(n.color,n.vis*(isHov?.55:.28))); gr.addColorStop(1,'transparent');
+      ctx.beginPath(); ctx.arc(n.px,n.py,n.screenR+20,0,TAU); ctx.fillStyle=gr; ctx.fill();
     }
-
-    // Node body
     ctx.beginPath(); ctx.arc(n.px,n.py,n.screenR,0,TAU);
-    if (isFile) {
-      const a = 0.25 + n.vis*0.75;
-      ctx.fillStyle = `rgba(10,22,14,${a.toFixed(2)})`;
-      ctx.strokeStyle = hexAlpha(n.color, 0.35 + n.vis*0.6);
-      ctx.lineWidth = isHov ? 2 : 1.5;
+    if(isFile){
+      ctx.fillStyle=`rgba(10,22,14,${(0.25+n.vis*.75).toFixed(2)})`;
+      ctx.strokeStyle=hexAlpha(n.color,0.35+n.vis*.6); ctx.lineWidth=isHov?2:1.5;
     } else {
-      ctx.fillStyle = hexAlpha(n.color, 0.05 + n.vis*0.1);
-      ctx.strokeStyle = hexAlpha(n.color, 0.12 + n.vis*0.28);
-      ctx.lineWidth = 0.8;
+      ctx.fillStyle=hexAlpha(n.color,0.05+n.vis*.1);
+      ctx.strokeStyle=hexAlpha(n.color,0.12+n.vis*.28); ctx.lineWidth=0.8;
     }
     ctx.fill(); ctx.stroke();
-
-    // Inner dot for file nodes
-    if (isFile) {
-      ctx.beginPath(); ctx.arc(n.px,n.py,2.5,0,TAU);
-      ctx.fillStyle = hexAlpha(n.color, 0.4 + n.vis*0.5); ctx.fill();
-    }
-
-    // Label (only when sufficiently visible)
-    const lVis = isFile ? (n.vis > 0.3 ? (n.vis-0.3)/0.7 : 0) : (n.vis > 0.5 ? (n.vis-0.5)/0.5 : 0);
-    if (lVis > 0.05) {
+    if(isFile){ ctx.beginPath(); ctx.arc(n.px,n.py,2.5,0,TAU); ctx.fillStyle=hexAlpha(n.color,0.4+n.vis*.5); ctx.fill(); }
+    const lVis=isFile?(n.vis>.3?(n.vis-.3)/.7:0):(n.vis>.5?(n.vis-.5)/.5:0);
+    if(lVis>.05){
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.font=`${isFile?'400':'300'} ${isFile?'10':'9'}px Inter`;
-      const rgb = isFile ? '200,240,215' : '160,200,180';
-      ctx.fillStyle=`rgba(${rgb},${(lVis*(isFile?0.9:0.7)).toFixed(2)})`;
-      ctx.fillText(n.label, n.px, n.py + n.screenR + (isFile?13:10));
+      ctx.fillStyle=`rgba(${isFile?'200,240,215':'160,200,180'},${(lVis*(isFile?.9:.7)).toFixed(2)})`;
+      ctx.fillText(n.label,n.px,n.py+n.screenR+(isFile?13:10));
       ctx.textAlign='left'; ctx.textBaseline='alphabetic';
     }
   }
 }
 
-function hexAlpha(hex, alpha) {
-  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${Math.max(0,Math.min(1,alpha)).toFixed(2)})`;
-}
+function draw(t){ ctx.clearRect(0,0,W,H); updateKN(); drawSphere(); drawKNEdges(); drawKNNodes(); }
+function loop(t){ draw(t); requestAnimationFrame(loop); }
 
-function draw(t) {
-  ctx.clearRect(0,0,W,H);
-  updateKN();
-  drawSphere();
-  drawKNEdges();
-  drawKNNodes();
-}
-
-function loop(t) { draw(t); requestAnimationFrame(loop); }
-
-function resize() {
+function resize(){
   const dpr=Math.min(window.devicePixelRatio||1,2);
   W=window.innerWidth; H=window.innerHeight;
-  SR = Math.min(W,H) * 0.36;
+  SR=Math.min(W,H)*(isMobile()?0.34:0.36);
   cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
   cv.style.width=W+'px'; cv.style.height=H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  initPanels();
+  if(!isMobile()) initDesktopPanels();
 }
 
-// canvas interaction
-function getNodeAt(x,y) {
-  for (let i=KN.length-1;i>=0;i--) {
-    const n=KN[i];
-    if(n.vis<0.15) continue;
-    if(Math.hypot(n.px-x,n.py-y)<n.screenR+8) return n;
+// canvas touch/click
+function getNodeAt(x,y){
+  for(let i=KN.length-1;i>=0;i--){
+    const n=KN[i]; if(n.vis<0.15) continue;
+    if(Math.hypot(n.px-x,n.py-y)<n.screenR+10) return n;
   }
   return null;
 }
-cv.addEventListener('mousemove',e=>{
-  hovNode=getNodeAt(e.clientX,e.clientY);
-  cv.style.cursor=hovNode?'pointer':'default';
-});
-cv.addEventListener('click',e=>{
-  const n=getNodeAt(e.clientX,e.clientY);
-  if(n && n.type==='file') openKnPopup(n.id);
-});
+cv.addEventListener('mousemove',e=>{ hovNode=getNodeAt(e.clientX,e.clientY); cv.style.cursor=hovNode?'pointer':'default'; });
+cv.addEventListener('click',e=>{ const n=getNodeAt(e.clientX,e.clientY); if(n&&n.type==='file') openKnPopup(n.id); });
 cv.addEventListener('mouseleave',()=>{ hovNode=null; });
 
-// ═══════════════════════════════════════
-// DRAGGABLE + RESIZABLE PANELS
-// ═══════════════════════════════════════
-function makePanel(el, barId, gripId) {
-  const bar  = document.getElementById(barId);
-  const grip = document.getElementById(gripId);
-  let mode=null, sx=0, sy=0, sl=0, st=0, sw=0, sh=0;
+// touch support
+let touchStartX=0, touchStartY=0;
+cv.addEventListener('touchstart',e=>{ touchStartX=e.touches[0].clientX; touchStartY=e.touches[0].clientY; },{passive:true});
+cv.addEventListener('touchend',e=>{
+  const t=e.changedTouches[0];
+  if(Math.hypot(t.clientX-touchStartX,t.clientY-touchStartY)<10){
+    const n=getNodeAt(t.clientX,t.clientY);
+    if(n&&n.type==='file') openKnPopup(n.id);
+  }
+});
 
+// ═══════════════════════════════════════
+// DESKTOP PANEL DRAG + RESIZE
+// ═══════════════════════════════════════
+function makePanel(el,barId,gripId){
+  const bar=document.getElementById(barId), grip=document.getElementById(gripId);
+  let mode=null,sx=0,sy=0,sl=0,st=0,sw=0,sh=0;
   function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
-
-  function onMove(e) {
-    const dx=e.clientX-sx, dy=e.clientY-sy;
-    if(mode==='drag'){
-      el.style.left  = clamp(sl+dx, 0, W-el.offsetWidth)+'px';
-      el.style.top   = clamp(st+dy, 0, H-40)+'px';
-    } else if(mode==='resize'){
-      el.style.width  = Math.max(180, sw+dx)+'px';
-      el.style.height = Math.max(80,  sh+dy)+'px';
-    }
+  function onMove(e){
+    const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(mode==='drag'){ el.style.left=clamp(sl+dx,0,W-el.offsetWidth)+'px'; el.style.top=clamp(st+dy,0,H-40)+'px'; }
+    else if(mode==='resize'){ el.style.width=Math.max(180,sw+dx)+'px'; el.style.height=Math.max(80,sh+dy)+'px'; }
   }
-  function onUp() {
-    mode=null;
-    document.removeEventListener('mousemove',onMove);
-    document.removeEventListener('mouseup',onUp);
-    document.body.style.userSelect='';
-    document.body.style.cursor='';
-  }
-
+  function onUp(){ mode=null; document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); document.body.style.userSelect=''; }
   bar.addEventListener('mousedown',e=>{
     if(e.target.closest('.add-btn')) return;
-    mode='drag';
-    sx=e.clientX; sy=e.clientY;
-    sl=el.offsetLeft; st=el.offsetTop;
+    mode='drag'; sx=e.clientX; sy=e.clientY; sl=el.offsetLeft; st=el.offsetTop;
     document.body.style.userSelect='none';
-    document.addEventListener('mousemove',onMove);
-    document.addEventListener('mouseup',onUp);
-    e.preventDefault();
+    document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp); e.preventDefault();
   });
-
   grip.addEventListener('mousedown',e=>{
-    mode='resize';
-    sx=e.clientX; sy=e.clientY;
-    sw=el.offsetWidth; sh=el.offsetHeight;
+    mode='resize'; sx=e.clientX; sy=e.clientY; sw=el.offsetWidth; sh=el.offsetHeight;
     document.body.style.userSelect='none';
-    document.body.style.cursor='se-resize';
-    document.addEventListener('mousemove',onMove);
-    document.addEventListener('mouseup',onUp);
-    e.preventDefault(); e.stopPropagation();
+    document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp); e.preventDefault(); e.stopPropagation();
   });
 }
 
-function initPanels() {
-  const logs  = document.getElementById('panel-logs');
-  const tasks = document.getElementById('panel-tasks');
-  const roi   = document.getElementById('panel-roi');
-
-  // Only set default position if not already positioned by drag
-  if (!logs._init) {
-    logs.style.cssText = `position:fixed;top:18px;left:18px;width:340px;height:300px;`;
-    logs._init = true;
-  }
-  if (!tasks._init) {
-    tasks.style.cssText = `position:fixed;top:18px;left:${W-298}px;width:280px;height:290px;`;
-    tasks._init = true;
-    makePanel(logs,  'bar-logs',  'rg-logs');
-    makePanel(tasks, 'bar-tasks', 'rg-tasks');
-    makePanel(roi,   'bar-roi',   'rg-roi');
-  }
-  if (!roi._init) {
-    roi.style.cssText = `position:fixed;top:${H-200}px;left:18px;width:200px;`;
-    roi._init = true;
-  }
-  // Keep TR panel right-aligned on resize if not dragged
-  if (!tasks._dragged) {
-    tasks.style.left = (W-298)+'px';
+function initDesktopPanels(){
+  const logs=document.getElementById('panel-logs');
+  const tasks=document.getElementById('panel-tasks');
+  const roi=document.getElementById('panel-roi');
+  if(!logs._init){
+    logs.style.cssText=`position:fixed;top:18px;left:18px;width:340px;height:300px;`;
+    tasks.style.cssText=`position:fixed;top:18px;left:${W-298}px;width:280px;height:290px;`;
+    roi.style.cssText=`position:fixed;top:${H-200}px;left:18px;width:200px;`;
+    logs._init=tasks._init=roi._init=true;
+    makePanel(logs,'bar-logs','rg-logs');
+    makePanel(tasks,'bar-tasks','rg-tasks');
+    makePanel(roi,'bar-roi','rg-roi');
+  } else if(!tasks._dragged){
+    tasks.style.left=(W-298)+'px';
   }
 }
 
 // ═══════════════════════════════════════
 // KNOWLEDGE POPUP
 // ═══════════════════════════════════════
-function openKnPopup(fileId) {
+function openKnPopup(fileId){
   STATE.activeKnFile=fileId;
-  renderKnTabs();
-  renderKnMD(fileId);
+  renderKnTabs(); renderKnMD(fileId);
   const f=DATA.knowledge.files.find(x=>x.id===fileId);
   document.getElementById('kn-popup-title').textContent=f?f.label:'Knowledge';
   document.getElementById('kn-popup').classList.add('open');
 }
-function closeKnPopup() {
-  document.getElementById('kn-popup').classList.remove('open');
-}
-function renderKnTabs() {
+function closeKnPopup(){ document.getElementById('kn-popup').classList.remove('open'); }
+function renderKnTabs(){
   document.getElementById('kn-tabs').innerHTML=DATA.knowledge.files.map(f=>`
     <div class="kn-tab ${STATE.activeKnFile===f.id?'active':''}" onclick="switchKnFile('${f.id}')">
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       ${f.label}
     </div>`).join('');
 }
-function switchKnFile(fileId) {
+function switchKnFile(fileId){
   STATE.activeKnFile=fileId;
   const f=DATA.knowledge.files.find(x=>x.id===fileId);
   document.getElementById('kn-popup-title').textContent=f?f.label:'Knowledge';
   renderKnTabs(); renderKnMD(fileId);
 }
-function renderKnMD(fileId) {
-  const out=document.getElementById('kn-md-out');
-  const raw=DATA.knowledge.content[fileId]||'# Introuvable';
-  try { out.innerHTML=typeof marked!=='undefined'?marked.parse(raw):`<pre>${raw}</pre>`; }
+function renderKnMD(fileId){
+  const out=document.getElementById('kn-md-out'), raw=DATA.knowledge.content[fileId]||'# Introuvable';
+  try{ out.innerHTML=typeof marked!=='undefined'?marked.parse(raw):`<pre>${raw}</pre>`; }
   catch(e){ out.innerHTML=`<pre>${raw}</pre>`; }
 }
 
 // ═══════════════════════════════════════
-// LOGS PANEL
+// LOGS
 // ═══════════════════════════════════════
-function renderLogs() {
-  const body=document.getElementById('log-body');
-  if(!body) return;
-  body.innerHTML=STATE.logs.slice(0,30).map(l=>`
-    <div class="log-entry ${l.st}">
-      <span class="log-ts">${l.ts}</span>
-      <span class="log-ag">[${l.ag}]</span>
-      <span class="log-msg">${l.act}</span>
-    </div>`).join('');
+function logHTML(l){
+  return `<div class="log-entry ${l.st}">
+    <span class="log-ts">${l.ts}</span>
+    <span class="log-ag">[${l.ag}]</span>
+    <span class="log-msg">${l.act}</span>
+  </div>`;
+}
+function renderLogs(){
+  const html=STATE.logs.slice(0,30).map(logHTML).join('');
+  const d=document.getElementById('log-body'); if(d) d.innerHTML=html;
+  const m=document.getElementById('mob-log-body'); if(m) m.innerHTML=html;
 }
 const liveSamples=[
   {ag:'LinkedIn',act:'Like post · nouvelle publication',st:'ok'},
@@ -948,27 +1008,33 @@ setInterval(()=>{
 },7000);
 
 // ═══════════════════════════════════════
-// TASKS PANEL
+// TASKS
 // ═══════════════════════════════════════
-function renderTasks() {
-  const body=document.getElementById('task-body');
-  if(!body) return;
+function taskHTML(t){
   const tb={li:'tb-li',msg:'tb-msg',pst:'tb-pst',con:'tb-con'};
-  body.innerHTML=DATA.tasks.map(t=>`
-    <div class="task-item">
-      <div class="task-status ${t.status}"></div>
-      <span class="task-name ${t.status==='doing'?'active':''}">${t.title}</span>
-      <span class="task-badge ${tb[t.type]||'tb-li'}">${t.type}</span>
-    </div>`).join('');
+  return `<div class="task-item">
+    <div class="task-status ${t.status}"></div>
+    <span class="task-name ${t.status==='doing'?'active':''}">${t.title}</span>
+    <span class="task-badge ${tb[t.type]||'tb-li'}">${t.type}</span>
+  </div>`;
 }
-function toggleAddForm() {
+function renderTasks(){
+  const html=DATA.tasks.map(taskHTML).join('');
+  const d=document.getElementById('task-body'); if(d) d.innerHTML=html;
+  const m=document.getElementById('mob-task-body'); if(m) m.innerHTML=html;
+}
+function toggleAddForm(){
   const f=document.getElementById('task-form');
   f.classList.toggle('open');
   if(f.classList.contains('open')) document.getElementById('tfi-title').focus();
 }
-function addTask() {
-  const title=document.getElementById('tfi-title').value.trim();
-  if(!title) return;
+function toggleMobAddForm(){
+  const f=document.getElementById('mob-task-form');
+  f.classList.toggle('open');
+  if(f.classList.contains('open')) document.getElementById('mob-tfi-title').focus();
+}
+function addTask(){
+  const title=document.getElementById('tfi-title').value.trim(); if(!title) return;
   const type=document.getElementById('tfi-type').value;
   DATA.tasks.push({id:Date.now(),title,type,time:'09:00',status:'todo'});
   localStorage.setItem('hm_tasks',JSON.stringify(DATA.tasks));
@@ -976,34 +1042,77 @@ function addTask() {
   document.getElementById('task-form').classList.remove('open');
   renderTasks();
 }
+function addTaskMob(){
+  const title=document.getElementById('mob-tfi-title').value.trim(); if(!title) return;
+  const type=document.getElementById('mob-tfi-type').value;
+  DATA.tasks.push({id:Date.now(),title,type,time:'09:00',status:'todo'});
+  localStorage.setItem('hm_tasks',JSON.stringify(DATA.tasks));
+  document.getElementById('mob-tfi-title').value='';
+  document.getElementById('mob-task-form').classList.remove('open');
+  renderTasks();
+}
 
 // ═══════════════════════════════════════
 // ROI LIVE
 // ═══════════════════════════════════════
-const ROI_T0=Date.now(), ROI_V0=14800, ROI_H0=52, ROI_VR=0.0057, ROI_HR=0.000145;
-function updateROI() {
+const ROI_T0=Date.now(),ROI_V0=14800,ROI_H0=52,ROI_VR=0.0057,ROI_HR=0.000145;
+function updateROI(){
   const el=(Date.now()-ROI_T0)/1000;
-  document.getElementById('roi-val').textContent=Math.round(ROI_V0+el*ROI_VR).toLocaleString('fr-FR')+'€';
-  document.getElementById('roi-hrs').textContent=(ROI_H0+el*ROI_HR).toFixed(2)+'h';
+  const v=Math.round(ROI_V0+el*ROI_VR).toLocaleString('fr-FR')+'€';
+  const h=(ROI_H0+el*ROI_HR).toFixed(2)+'h';
+  document.getElementById('roi-val').textContent=v;
+  document.getElementById('roi-hrs').textContent=h;
+  const vm=document.getElementById('roi-val-mob'); if(vm) vm.textContent=v;
+  const hm=document.getElementById('roi-hrs-mob'); if(hm) hm.textContent=h;
 }
 setInterval(updateROI,200);
 
 // ═══════════════════════════════════════
-// SHEETS
+// MOBILE TABS
 // ═══════════════════════════════════════
-function toggleSheet(id) {
-  const el=document.getElementById('sheet-'+id);
-  if(!el) return;
-  const isOpen=STATE.openSheets[id];
-  Object.keys(STATE.openSheets).forEach(k=>{
+const MOB_SHEETS=['logs','tasks','roi'];
+function mobTab(id){
+  const isOpen=STATE.openMobSheets[id];
+  // close all mobile sheets first
+  MOB_SHEETS.forEach(k=>{
     document.getElementById('sheet-'+k)?.classList.remove('open');
-    document.querySelectorAll('.nb').forEach(b=>{if(b.textContent.toLowerCase().includes(k))b.classList.remove('active');});
+    document.getElementById('mtab-'+k)?.classList.remove('active');
+    delete STATE.openMobSheets[k];
+  });
+  // also close desktop sheets
+  ['prospects','linkedin'].forEach(k=>{
+    document.getElementById('sheet-'+k)?.classList.remove('open');
+    document.getElementById('mtab-'+k)?.classList.remove('active');
     delete STATE.openSheets[k];
+  });
+  if(!isOpen){
+    document.getElementById('sheet-'+id)?.classList.add('open');
+    document.getElementById('mtab-'+id)?.classList.add('active');
+    STATE.openMobSheets[id]=true;
+  }
+}
+function closeMobSheet(id){
+  document.getElementById('sheet-'+id)?.classList.remove('open');
+  document.getElementById('mtab-'+id)?.classList.remove('active');
+  delete STATE.openMobSheets[id];
+}
+
+// ═══════════════════════════════════════
+// SHEETS (desktop)
+// ═══════════════════════════════════════
+function toggleSheet(id){
+  const el=document.getElementById('sheet-'+id); if(!el) return;
+  const isOpen=STATE.openSheets[id];
+  // close all sheets
+  [...Object.keys(STATE.openSheets),...Object.keys(STATE.openMobSheets)].forEach(k=>{
+    document.getElementById('sheet-'+k)?.classList.remove('open');
+    document.querySelectorAll('.nb,.mob-tab').forEach(b=>{ if(b.textContent.toLowerCase().includes(k)) b.classList.remove('active'); });
+    delete STATE.openSheets[k]; delete STATE.openMobSheets[k];
   });
   if(!isOpen){
     el.classList.add('open');
     STATE.openSheets[id]=true;
-    document.querySelectorAll('.nb').forEach(b=>{if(b.textContent.toLowerCase().includes(id))b.classList.add('active');});
+    document.querySelectorAll('.nb,.mob-tab').forEach(b=>{ if(b.textContent.toLowerCase().includes(id)) b.classList.add('active'); });
     if(id==='prospects') renderProspects();
     if(id==='linkedin'){ renderLinkedIn(); renderBlacklist(); }
   }
@@ -1012,9 +1121,8 @@ function toggleSheet(id) {
 // ═══════════════════════════════════════
 // PROSPECTS
 // ═══════════════════════════════════════
-function renderProspects() {
-  const body=document.getElementById('prospect-tbody');
-  if(!body) return;
+function renderProspects(){
+  const body=document.getElementById('prospect-tbody'); if(!body) return;
   const list=DATA.prospects.filter(p=>
     (!STATE.prospectSearch||p.nom.toLowerCase().includes(STATE.prospectSearch.toLowerCase())||p.titre.toLowerCase().includes(STATE.prospectSearch.toLowerCase()))&&
     (!STATE.prospectFilter||p.statut===STATE.prospectFilter)
@@ -1025,17 +1133,16 @@ function renderProspects() {
       <td><div style="font-weight:500;font-size:12px">${p.nom}</div><div style="font-size:10px;color:var(--text-3)">${p.titre}</div></td>
       <td><span class="sbadge ${sMap[p.statut]||'s-froid'}">${p.statut}</span></td>
       <td style="font-size:11px;color:var(--text-2)">${p.contact}</td>
-      <td><button style="background:transparent;border:none;color:var(--text-2);cursor:pointer;font-size:16px;line-height:1" onclick="event.stopPropagation();openSlide(${p.id})">›</button></td>
+      <td><button style="background:transparent;border:none;color:var(--text-2);cursor:pointer;font-size:18px;line-height:1;padding:4px" onclick="event.stopPropagation();openSlide(${p.id})">›</button></td>
     </tr>`).join('');
 }
-function filterProspects(q,f) {
+function filterProspects(q,f){
   if(q!==undefined) STATE.prospectSearch=q;
   if(f!==undefined) STATE.prospectFilter=f;
   renderProspects();
 }
-function openSlide(id) {
-  const p=DATA.prospects.find(x=>x.id===id);
-  if(!p) return;
+function openSlide(id){
+  const p=DATA.prospects.find(x=>x.id===id); if(!p) return;
   document.getElementById('sl-name').textContent=p.nom;
   document.getElementById('sl-role').textContent=p.titre;
   const sMap={Froid:'s-froid',Tiède:'s-tiede',Chaud:'s-chaud','RDV pris':'s-rdv',Ghosté:'s-ghost'};
@@ -1051,17 +1158,16 @@ function openSlide(id) {
   document.getElementById('pslide').classList.add('on');
   document.getElementById('overlay').classList.add('on');
 }
-function closeSlide() {
+function closeSlide(){
   document.getElementById('pslide').classList.remove('on');
   document.getElementById('overlay').classList.remove('on');
 }
 
 // ═══════════════════════════════════════
-// LINKEDIN SHEET
+// LINKEDIN
 // ═══════════════════════════════════════
-function renderLinkedIn() {
-  const box=document.getElementById('li-day');
-  if(!box) return;
+function renderLinkedIn(){
+  const box=document.getElementById('li-day'); if(!box) return;
   box.innerHTML=DATA.linkedin.daily.map(d=>{
     const p=Math.min(100,Math.round(d.val/d.tgt*100));
     return `<div class="li-row">
@@ -1071,50 +1177,47 @@ function renderLinkedIn() {
     </div>`;
   }).join('');
 }
-function renderBlacklist() {
-  const box=document.getElementById('bl-list');
-  if(!box) return;
+function renderBlacklist(){
+  const box=document.getElementById('bl-list'); if(!box) return;
   box.innerHTML=STATE.blacklist.length
     ?STATE.blacklist.map((x,i)=>`<div class="bl-item"><span>${x}</span><button class="bl-rm" onclick="rmBl(${i})">Retirer</button></div>`).join('')
     :`<div style="font-size:11px;color:var(--text-3)">Aucun profil bloqué.</div>`;
 }
-function addBl() {
-  const inp=document.getElementById('bl-inp');
-  if(!inp||!inp.value.trim()) return;
-  STATE.blacklist.push(inp.value.trim());
-  localStorage.setItem('hm_bl',JSON.stringify(STATE.blacklist));
+function addBl(){
+  const inp=document.getElementById('bl-inp'); if(!inp||!inp.value.trim()) return;
+  STATE.blacklist.push(inp.value.trim()); localStorage.setItem('hm_bl',JSON.stringify(STATE.blacklist));
   inp.value=''; renderBlacklist();
 }
-function rmBl(i) {
-  STATE.blacklist.splice(i,1);
-  localStorage.setItem('hm_bl',JSON.stringify(STATE.blacklist));
-  renderBlacklist();
-}
+function rmBl(i){ STATE.blacklist.splice(i,1); localStorage.setItem('hm_bl',JSON.stringify(STATE.blacklist)); renderBlacklist(); }
 
 // ═══════════════════════════════════════
 // CLOCK & HEALTH
 // ═══════════════════════════════════════
 (function tick(){
-  document.getElementById('clock').textContent=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date());
+  const t=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date());
+  const ts=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit'}).format(new Date());
+  const c=document.getElementById('clock'); if(c) c.textContent=t;
+  const cm=document.getElementById('clock-mob'); if(cm) cm.textContent=ts;
   setTimeout(tick,1000);
 })();
+
 async function checkHealth(){
+  const setStatus=(on,txt)=>{
+    ['srv-dot','srv-dot-mob'].forEach(id=>{ const d=document.getElementById(id); if(d) d.classList.toggle('on',on); });
+    const s=document.getElementById('srv-txt'); if(s) s.textContent=txt;
+  };
   try{
     const r=await fetch('/api/health',{signal:AbortSignal.timeout(4000)});
     if(!r.ok) throw 0;
-    document.getElementById('srv-dot').classList.add('on');
-    document.getElementById('srv-txt').textContent='Online';
-  }catch{
-    document.getElementById('srv-dot').classList.remove('on');
-    document.getElementById('srv-txt').textContent='Offline';
-  }
+    setStatus(true,'Online');
+  }catch{ setStatus(false,'Offline'); }
 }
 
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
 resize();
-window.addEventListener('resize', ()=>{ resize(); });
+window.addEventListener('resize', resize);
 requestAnimationFrame(loop);
 renderLogs();
 renderTasks();
