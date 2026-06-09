@@ -1,0 +1,16 @@
+{
+  "name": "BenIT — Dashboard",
+  "short_name": "BenIT",
+  "description": "Tableau de bord BenIT — suivi des agents et du ROI.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F6F5",
+  "theme_color": "#FFFFFF",
+  "icons": [
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
