@@ -1,559 +1,577 @@
-"""
-Agent B — Backend API
-pip install fastapi uvicorn python-multipart aiofiles
-Run: uvicorn server:app --reload --port 8000
-"""
+from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
-from typing import Optional, Literal
-import sqlite3, json, time, uuid, os
+import json
+import os
+import re
+import sqlite3
+import urllib.request
+from datetime import datetime, timezone
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlparse, parse_qs
 
-app = FastAPI(title="Agent B API")
+ROOT_DIR = Path(__file__).resolve().parent
+DASHBOARD_DIR = ROOT_DIR / "dashboard"
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Bases de données
+AGENT_DB = Path("/opt/data/kanban.db")        # tâches réelles d'Hermes
+STATE_DB = Path("/opt/data/state.db")          # messages/logs réels d'Hermes
+DASH_DB = ROOT_DIR / "agent_b.db"             # données propres au dashboard (ROI, pending, logs dashboard)
 
-# ── Serve frontend ─────────────────────────────────────────────
-DASHBOARD_DIR = Path(__file__).parent / "dashboard"
-app.mount("/static", StaticFiles(directory=str(DASHBOARD_DIR)), name="static")
+SKILLS_DIR = Path("/opt/data/skills")
+CRON_FILE = Path("/opt/data/cron/jobs.json")
 
-@app.get("/")
-async def root():
-    return FileResponse(str(DASHBOARD_DIR / "index.html"))
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "8000"))
 
-# ── Database ───────────────────────────────────────────────────
-DB = Path(__file__).parent / "agent_b.db"
 
-def get_db():
-    conn = sqlite3.connect(str(DB))
-    conn.row_factory = sqlite3.Row
-    return conn
+# ── ENV ────────────────────────────────────────────────────────────────────────
+def _env(key: str) -> str:
+    val = os.environ.get(key, "")
+    if val:
+        return val
+    env_file = Path("/opt/data/.env")
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line.startswith(key + "="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
 
-def init_db():
-    conn = get_db()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS logs (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            level       TEXT    DEFAULT 'info',
-            agent       TEXT    DEFAULT 'System',
-            message     TEXT    NOT NULL,
-            metadata    TEXT,
-            created_at  REAL    DEFAULT (unixepoch('now'))
-        );
-        CREATE TABLE IF NOT EXISTS tasks (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            title       TEXT    NOT NULL,
-            type        TEXT    DEFAULT 'li',
-            status      TEXT    DEFAULT 'todo',
-            agent       TEXT,
-            metadata    TEXT,
-            created_at  REAL    DEFAULT (unixepoch('now')),
-            updated_at  REAL    DEFAULT (unixepoch('now'))
-        );
-        CREATE TABLE IF NOT EXISTS roi_entries (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            label       TEXT,
-            value_eur   REAL    DEFAULT 0,
-            hours       REAL    DEFAULT 0,
-            agent       TEXT    DEFAULT 'System',
-            created_at  REAL    DEFAULT (unixepoch('now'))
-        );
-        CREATE TABLE IF NOT EXISTS scheduled_actions (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            title        TEXT    NOT NULL,
-            agent        TEXT,
-            scheduled_at REAL,
-            status       TEXT    DEFAULT 'pending',
-            metadata     TEXT,
-            created_at   REAL    DEFAULT (unixepoch('now'))
-        );
-        CREATE TABLE IF NOT EXISTS metrics (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent       TEXT    NOT NULL,
-            key         TEXT    NOT NULL,
-            value       REAL    NOT NULL,
-            recorded_at REAL    DEFAULT (unixepoch('now'))
-        );
-        CREATE TABLE IF NOT EXISTS messages (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            content     TEXT,
-            type        TEXT    DEFAULT 'text',
-            file_path   TEXT,
-            direction   TEXT    DEFAULT 'to_agent',
-            created_at  REAL    DEFAULT (unixepoch('now'))
-        );
-    """)
-    conn.commit()
-    conn.close()
 
-init_db()
-
-# ══════════════════════════════════════════════════════════════
-#  HEALTH  (used by Hermes / monitoring to confirm the server is up)
-# ══════════════════════════════════════════════════════════════
-
-@app.get("/api/health")
-async def health():
-    """Liveness check — confirms the API is up and the database is reachable."""
-    try:
-        conn = get_db()
-        logs = conn.execute("SELECT COUNT(*) AS n FROM logs").fetchone()["n"]
-        pending = conn.execute(
-            "SELECT COUNT(*) AS n FROM tasks WHERE status IN ('pending_validation','waiting')"
-        ).fetchone()["n"]
-        conn.close()
-        return {"status": "ok", "time": time.time(), "logs": logs, "pending_validations": pending}
-    except Exception as e:
-        return JSONResponse(status_code=503, content={"status": "error", "detail": str(e)})
-
-# ══════════════════════════════════════════════════════════════
-#  LOGS
-# ══════════════════════════════════════════════════════════════
-
-class LogCreate(BaseModel):
-    level:   Literal['info', 'warn', 'warning', 'error', 'err', 'ok'] = 'info'
-    agent:   str = 'System'
-    message: str
-    metadata: Optional[dict] = None
-
-@app.get("/api/logs")
-async def get_logs(limit: int = 100, agent: Optional[str] = None, level: Optional[str] = None):
-    conn = get_db()
-    query = "SELECT * FROM logs"
-    params = []
-    conditions = []
-    if agent:
-        conditions.append("agent = ?")
-        params.append(agent)
-    if level:
-        conditions.append("level = ?")
-        params.append(level)
-    if conditions:
-        query += " WHERE " + " AND ".join(conditions)
-    query += " ORDER BY created_at DESC LIMIT ?"
-    params.append(limit)
-    rows = conn.execute(query, params).fetchall()
-    conn.close()
-    return {"logs": [dict(r) for r in rows]}
-
-@app.post("/api/logs", status_code=201)
-async def create_log(log: LogCreate):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO logs (level, agent, message, metadata) VALUES (?,?,?,?)",
-        (log.level, log.agent, log.message, json.dumps(log.metadata) if log.metadata else None)
-    )
-    conn.commit()
-    log_id = c.lastrowid
-    conn.close()
-    return {"id": log_id, "status": "created"}
-
-# ══════════════════════════════════════════════════════════════
-#  TASKS
-# ══════════════════════════════════════════════════════════════
-
-class TaskCreate(BaseModel):
-    title:    str
-    type:     str = 'li'
-    status:   str = 'todo'
-    agent:    Optional[str] = None
-    metadata: Optional[dict] = None
-
-class TaskUpdate(BaseModel):
-    status: Optional[str] = None
-    title:  Optional[str] = None
-
-@app.get("/api/tasks")
-async def get_tasks(status: Optional[str] = None):
-    conn = get_db()
-    if status:
-        rows = conn.execute("SELECT * FROM tasks WHERE status=? ORDER BY created_at DESC", (status,)).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-    conn.close()
-    return {"tasks": [dict(r) for r in rows]}
-
-@app.post("/api/tasks", status_code=201)
-async def create_task(task: TaskCreate):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO tasks (title, type, status, agent, metadata) VALUES (?,?,?,?,?)",
-        (task.title, task.type, task.status, task.agent, json.dumps(task.metadata) if task.metadata else None)
-    )
-    conn.commit()
-    task_id = c.lastrowid
-    conn.close()
-    return {"task": {"id": task_id, "title": task.title, "status": task.status}}
-
-@app.put("/api/tasks/{task_id}")
-async def update_task(task_id: int, update: TaskUpdate):
-    conn = get_db()
-    conn.execute(
-        "UPDATE tasks SET status=COALESCE(?,status), title=COALESCE(?,title), updated_at=unixepoch('now') WHERE id=?",
-        (update.status, update.title, task_id)
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "updated"}
-
-@app.delete("/api/tasks/{task_id}")
-async def delete_task(task_id: int):
-    conn = get_db()
-    conn.execute("DELETE FROM tasks WHERE id=?", (task_id,))
-    conn.commit()
-    conn.close()
-    return {"status": "deleted"}
-
-# ══════════════════════════════════════════════════════════════
-#  ROI
-# ══════════════════════════════════════════════════════════════
-
-class ROIEntry(BaseModel):
-    label:     str
-    value_eur: float
-    hours:     float = 0
-    agent:     str = 'System'
-
-@app.get("/api/roi")
-async def get_roi():
-    conn = get_db()
-    entries = conn.execute("SELECT * FROM roi_entries ORDER BY created_at DESC").fetchall()
-    conn.close()
-    entries = [dict(e) for e in entries]
-    return {
-        "total_value_eur": sum(e["value_eur"] for e in entries),
-        "total_hours":     sum(e["hours"]     for e in entries),
-        "entries":         entries,
-    }
-
-@app.post("/api/roi", status_code=201)
-async def add_roi(entry: ROIEntry):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO roi_entries (label, value_eur, hours, agent) VALUES (?,?,?,?)",
-        (entry.label, entry.value_eur, entry.hours, entry.agent)
-    )
-    conn.commit()
-    roi_id = c.lastrowid
-    conn.close()
-    return {"id": roi_id, "status": "created"}
-
-# ══════════════════════════════════════════════════════════════
-#  SCHEDULED ACTIONS
-# ══════════════════════════════════════════════════════════════
-
-class ScheduledCreate(BaseModel):
-    title:        str
-    agent:        str
-    scheduled_at: float          # unix timestamp (seconds)
-    metadata:     Optional[dict] = None
-
-class ScheduledUpdate(BaseModel):
-    status: Optional[str] = None
-
-@app.get("/api/scheduled")
-async def get_scheduled(status: str = 'pending'):
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM scheduled_actions WHERE status=? ORDER BY scheduled_at ASC",
-        (status,)
-    ).fetchall()
-    conn.close()
-    return {"scheduled": [dict(r) for r in rows]}
-
-@app.post("/api/scheduled", status_code=201)
-async def create_scheduled(action: ScheduledCreate):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO scheduled_actions (title, agent, scheduled_at, metadata) VALUES (?,?,?,?)",
-        (action.title, action.agent, action.scheduled_at, json.dumps(action.metadata) if action.metadata else None)
-    )
-    conn.commit()
-    action_id = c.lastrowid
-    conn.close()
-    return {"id": action_id, "status": "created"}
-
-@app.put("/api/scheduled/{action_id}")
-async def update_scheduled(action_id: int, update: ScheduledUpdate):
-    conn = get_db()
-    conn.execute(
-        "UPDATE scheduled_actions SET status=COALESCE(?,status) WHERE id=?",
-        (update.status, action_id)
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "updated"}
-
-# ══════════════════════════════════════════════════════════════
-#  METRICS  (per-agent time-series)
-# ══════════════════════════════════════════════════════════════
-
-class MetricPost(BaseModel):
-    agent: str
-    key:   str
-    value: float
-
-@app.get("/api/metrics/{agent}")
-async def get_metrics(agent: str, days: int = 30):
-    conn = get_db()
-    since = time.time() - days * 86400
-    rows = conn.execute(
-        "SELECT key, value, recorded_at FROM metrics WHERE agent=? AND recorded_at>? ORDER BY recorded_at DESC",
-        (agent, since)
-    ).fetchall()
-    conn.close()
-    rows = [dict(r) for r in rows]
-    # Latest value per key
-    latest = {}
-    for r in rows:
-        if r["key"] not in latest:
-            latest[r["key"]] = r["value"]
-    return {"agent": agent, "latest": latest, "history": rows}
-
-@app.post("/api/metrics", status_code=201)
-async def post_metric(m: MetricPost):
-    conn = get_db()
-    conn.execute("INSERT INTO metrics (agent, key, value) VALUES (?,?,?)", (m.agent, m.key, m.value))
-    conn.commit()
-    conn.close()
-    return {"status": "recorded"}
-
-# ══════════════════════════════════════════════════════════════
-#  TELEGRAM
-# ══════════════════════════════════════════════════════════════
-
-class TelegramMsg(BaseModel):
-    message: str
-    task_id: Optional[int] = None
-
-@app.post("/api/telegram/send")
-async def telegram_send(msg: TelegramMsg):
-    # Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID environment variables
-    token   = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
-    if token and chat_id:
-        import urllib.request, urllib.parse
-        text = msg.message
-        if msg.task_id:
-            text = f"[Tâche #{msg.task_id}] {text}"
-        payload = json.dumps({"chat_id": chat_id, "text": text}).encode()
-        req = urllib.request.Request(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
+# ── DB INIT ────────────────────────────────────────────────────────────────────
+def init_db() -> None:
+    with sqlite3.connect(DASH_DB) as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            level TEXT NOT NULL DEFAULT 'info',
+            agent TEXT DEFAULT 'Système',
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS roi_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_name TEXT NOT NULL,
+            duration_minutes REAL NOT NULL,
+            hours_saved REAL NOT NULL,
+            value_eur REAL NOT NULL,
+            created_at TEXT NOT NULL
+        )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS pending_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent TEXT NOT NULL,
+            action_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT DEFAULT '',
+            meta TEXT DEFAULT '',
+            status TEXT DEFAULT 'pending',
+            created_at TEXT NOT NULL
+        )""")
         try:
-            urllib.request.urlopen(req, timeout=5)
+            conn.execute("ALTER TABLE logs ADD COLUMN agent TEXT DEFAULT 'Système'")
         except Exception:
             pass
-    return {"status": "sent"}
+        conn.commit()
 
-# ══════════════════════════════════════════════════════════════
-#  AGENT COMMUNICATION
-# ══════════════════════════════════════════════════════════════
 
-class AgentMessage(BaseModel):
-    content: str
-    ts:      Optional[str] = None
+# ── LOGS — lit depuis state.db (vrais messages Hermes) + dash_db ──────────────
+def read_logs(limit: int = 100, agent: str = None) -> list[dict]:
+    results = []
 
-@app.post("/api/agent/message", status_code=201)
-async def agent_message(data: AgentMessage):
-    """Text message or note from the dashboard user to the agent."""
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO messages (content, type, direction) VALUES (?,?,?)",
-        (data.content, 'text', 'to_agent')
-    )
-    # Also log it so it shows up in the activity feed
-    conn.execute(
-        "INSERT INTO logs (level, agent, message) VALUES (?,?,?)",
-        ('info', 'Dashboard', f'Message utilisateur : "{data.content[:120]}"')
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "received"}
-
-@app.post("/api/agent/audio", status_code=201)
-async def agent_audio(audio: UploadFile = File(...)):
-    """Voice message from the dashboard user."""
-    audio_dir = Path(__file__).parent / "uploads" / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid.uuid4()}.webm"
-    path = audio_dir / filename
-    with open(path, "wb") as f:
-        f.write(await audio.read())
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO messages (content, type, file_path, direction) VALUES (?,?,?,?)",
-        ('Message vocal', 'audio', str(path), 'to_agent')
-    )
-    conn.execute(
-        "INSERT INTO logs (level, agent, message) VALUES (?,?,?)",
-        ('info', 'Dashboard', 'Message vocal reçu')
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "received", "file": filename}
-
-@app.post("/api/agent/document", status_code=201)
-async def agent_document(doc: UploadFile = File(...)):
-    """Document upload from the dashboard user."""
-    doc_dir = Path(__file__).parent / "uploads" / "documents"
-    doc_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid.uuid4()}_{doc.filename}"
-    path = doc_dir / filename
-    with open(path, "wb") as f:
-        f.write(await doc.read())
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO messages (content, type, file_path, direction) VALUES (?,?,?,?)",
-        (doc.filename, 'document', str(path), 'to_agent')
-    )
-    conn.execute(
-        "INSERT INTO logs (level, agent, message) VALUES (?,?,?)",
-        ('info', 'Dashboard', f'Document reçu : {doc.filename}')
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "received", "file": filename}
-
-@app.get("/api/agent/messages")
-async def get_messages(direction: str = 'to_agent', limit: int = 50):
-    """Agent reads messages sent from the dashboard."""
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM messages WHERE direction=? ORDER BY created_at DESC LIMIT ?",
-        (direction, limit)
-    ).fetchall()
-    conn.close()
-    return {"messages": [dict(r) for r in rows]}
-
-# ══════════════════════════════════════════════════════════════
-#  AUTOMATION REQUESTS  ("cette tâche est-elle automatisable ?")
-# ══════════════════════════════════════════════════════════════
-
-AUTOMATION_EMAIL = os.getenv("AUTOMATION_EMAIL", "benitez.noapro@gmail.com")
-
-def _send_email(subject: str, body: str, to_addr: str) -> bool:
-    """Send an email if SMTP_* env vars are set. Returns True on success, False otherwise.
-    Configure with: SMTP_HOST, SMTP_USER, SMTP_PASS, optional SMTP_PORT (587/465), SMTP_FROM."""
-    host = os.getenv("SMTP_HOST")
-    user = os.getenv("SMTP_USER")
-    pwd  = os.getenv("SMTP_PASS")
-    if not (host and user and pwd):
-        return False
-    import smtplib, ssl
-    from email.message import EmailMessage
-    port   = int(os.getenv("SMTP_PORT", "587"))
-    sender = os.getenv("SMTP_FROM", user)
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"]    = sender
-    msg["To"]      = to_addr
-    msg.set_content(body)
+    # 1. Logs dashboard (POST /api/logs)
     try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, context=ssl.create_default_context()) as s:
-                s.login(user, pwd); s.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port) as s:
-                s.starttls(context=ssl.create_default_context()); s.login(user, pwd); s.send_message(msg)
+        with sqlite3.connect(DASH_DB) as conn:
+            conn.row_factory = sqlite3.Row
+            if agent:
+                rows = conn.execute(
+                    "SELECT id, level, agent, message, created_at FROM logs WHERE agent=? ORDER BY id DESC LIMIT ?",
+                    (agent, limit)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT id, level, agent, message, created_at FROM logs ORDER BY id DESC LIMIT ?",
+                    (limit,)
+                ).fetchall()
+            results.extend([dict(r) for r in rows])
+    except Exception:
+        pass
+
+    # 2. Messages Hermes depuis state.db (si pas de filtre agent)
+    if not agent and STATE_DB.exists():
+        try:
+            with sqlite3.connect(STATE_DB) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """SELECT id, role, content, timestamp FROM messages
+                    WHERE role IN ('assistant','tool')
+                    ORDER BY id DESC LIMIT ?""",
+                    (limit,)
+                ).fetchall()
+                for r in rows:
+                    content = str(r["content"] or "")
+                    # Filtrer les messages trop courts ou JSON pur
+                    if len(content) < 10:
+                        continue
+                    # Tronquer les messages longs
+                    msg = content[:200].replace('\n', ' ')
+                    ts = r["timestamp"]
+                    if ts and isinstance(ts, (int, float)):
+                        ts = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                    results.append({
+                        "id": f"h_{r['id']}",
+                        "level": "info",
+                        "agent": "Hermes" if r["role"] == "assistant" else "Tool",
+                        "message": msg,
+                        "created_at": ts or ""
+                    })
+        except Exception:
+            pass
+
+    # Trier par date décroissante
+    def sort_key(x):
+        ts = x.get("created_at") or ""
+        return str(ts)
+
+    results.sort(key=sort_key, reverse=True)
+    return results[:limit]
+
+
+def add_log(level: str, message: str, agent: str = "Système") -> dict:
+    created_at = datetime.now(timezone.utc).isoformat()
+    if not message.strip():
+        raise ValueError("message is required")
+    with sqlite3.connect(DASH_DB) as conn:
+        cur = conn.execute(
+            "INSERT INTO logs (level,agent,message,created_at) VALUES (?,?,?,?)",
+            (level.strip().lower()[:32], agent.strip()[:64], message.strip(), created_at)
+        )
+        conn.commit()
+    return {"id": cur.lastrowid, "level": level, "agent": agent, "message": message, "created_at": created_at}
+
+
+# ── TASKS — lit depuis kanban.db (vraies tâches Hermes) ──────────────────────
+def read_tasks() -> list[dict]:
+    tasks = []
+
+    # 1. Tâches Hermes depuis kanban.db
+    if AGENT_DB.exists():
+        try:
+            with sqlite3.connect(AGENT_DB) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """SELECT id, title, status, created_at FROM tasks
+                    ORDER BY CASE status
+                        WHEN 'doing' THEN 0
+                        WHEN 'todo' THEN 1
+                        WHEN 'in_progress' THEN 0
+                        WHEN 'pending' THEN 1
+                        ELSE 2 END, id DESC
+                    LIMIT 50"""
+                ).fetchall()
+                for r in rows:
+                    status = r["status"]
+                    # Normaliser les statuts
+                    if status in ("in_progress", "doing", "running"):
+                        status = "doing"
+                    elif status in ("done", "completed", "finished"):
+                        status = "done"
+                    elif status in ("todo", "pending", "queued"):
+                        status = "todo"
+                    tasks.append({
+                        "id": f"k_{r['id']}",
+                        "title": r["title"] or "",
+                        "type": "li",
+                        "status": status,
+                        "created_at": r["created_at"] or "",
+                        "source": "hermes"
+                    })
+        except Exception:
+            pass
+
+    # 2. Tâches dashboard (ajoutées manuellement)
+    try:
+        with sqlite3.connect(DASH_DB) as conn:
+            conn.row_factory = sqlite3.Row
+            if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'").fetchone():
+                rows = conn.execute(
+                    "SELECT id,title,type,status,created_at FROM tasks ORDER BY id DESC LIMIT 20"
+                ).fetchall()
+                tasks.extend([{**dict(r), "source": "dashboard"} for r in rows])
+    except Exception:
+        pass
+
+    return tasks
+
+
+def add_task(title: str, type_: str = "li", status: str = "todo") -> dict:
+    created_at = datetime.now(timezone.utc).isoformat()
+    # Créer la table si besoin
+    with sqlite3.connect(DASH_DB) as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            type TEXT DEFAULT 'li',
+            status TEXT DEFAULT 'todo',
+            created_at TEXT NOT NULL
+        )""")
+        cur = conn.execute(
+            "INSERT INTO tasks (title,type,status,created_at) VALUES (?,?,?,?)",
+            (title.strip(), type_.strip(), status.strip(), created_at)
+        )
+        conn.commit()
+    return {"id": cur.lastrowid, "title": title, "type": type_, "status": status, "created_at": created_at}
+
+
+def update_task(task_id: str, status: str) -> dict | None:
+    # Tâche kanban
+    if str(task_id).startswith("k_"):
+        real_id = str(task_id)[2:]
+        status_map = {"done": "done", "doing": "in_progress", "todo": "pending"}
+        db_status = status_map.get(status, status)
+        with sqlite3.connect(AGENT_DB) as conn:
+            conn.execute("UPDATE tasks SET status=? WHERE id=?", (db_status, real_id))
+            conn.commit()
+        return {"id": task_id, "status": status}
+    # Tâche dashboard
+    try:
+        with sqlite3.connect(DASH_DB) as conn:
+            conn.execute("UPDATE tasks SET status=? WHERE id=?", (status, task_id))
+            conn.commit()
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def delete_task(task_id) -> bool:
+    try:
+        with sqlite3.connect(DASH_DB) as conn:
+            conn.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+            conn.commit()
+    except Exception:
+        pass
+    return True
+
+
+# ── ROI ────────────────────────────────────────────────────────────────────────
+def read_roi() -> dict:
+    with sqlite3.connect(DASH_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM roi_entries ORDER BY id DESC LIMIT 50").fetchall()
+    entries = [dict(r) for r in rows]
+    return {
+        "total_hours": round(sum(e["hours_saved"] for e in entries), 2),
+        "total_value_eur": round(sum(e["value_eur"] for e in entries), 2),
+        "rate_per_hour": 50,
+        "entries": entries
+    }
+
+
+def add_roi(task_name: str, duration_minutes: float) -> dict:
+    hours_saved = duration_minutes / 60
+    value_eur = hours_saved * 50
+    created_at = datetime.now(timezone.utc).isoformat()
+    with sqlite3.connect(DASH_DB) as conn:
+        conn.execute(
+            "INSERT INTO roi_entries (task_name,duration_minutes,hours_saved,value_eur,created_at) VALUES (?,?,?,?,?)",
+            (task_name, duration_minutes, round(hours_saved, 4), round(value_eur, 2), created_at)
+        )
+        conn.commit()
+    return {"task_name": task_name, "hours_saved": round(hours_saved, 4), "value_eur": round(value_eur, 2)}
+
+
+# ── PENDING ────────────────────────────────────────────────────────────────────
+def read_pending() -> list[dict]:
+    with sqlite3.connect(DASH_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM pending_actions WHERE status='pending' ORDER BY id DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def add_pending(agent: str, action_type: str, title: str, content: str = "", meta: str = "") -> dict:
+    created_at = datetime.now(timezone.utc).isoformat()
+    with sqlite3.connect(DASH_DB) as conn:
+        cur = conn.execute(
+            "INSERT INTO pending_actions (agent,action_type,title,content,meta,status,created_at) VALUES (?,?,?,?,?,'pending',?)",
+            (agent, action_type, title, content, meta, created_at)
+        )
+        conn.commit()
+    return {"id": cur.lastrowid, "agent": agent, "action_type": action_type, "title": title}
+
+
+def resolve_pending(action_id: int, approved: bool) -> dict | None:
+    status = "approved" if approved else "rejected"
+    with sqlite3.connect(DASH_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("UPDATE pending_actions SET status=? WHERE id=?", (status, action_id))
+        conn.commit()
+        row = conn.execute("SELECT * FROM pending_actions WHERE id=?", (action_id,)).fetchone()
+    return dict(row) if row else None
+
+
+# ── SCHEDULED / CRONS ─────────────────────────────────────────────────────────
+def read_scheduled() -> list[dict]:
+    if not CRON_FILE.exists():
+        return []
+    try:
+        data = json.loads(CRON_FILE.read_text())
+        result = []
+        for j in data.get("jobs", []):
+            result.append({
+                "id": j.get("id", ""),
+                "title": (j.get("name") or "")[:50],
+                "agent": _guess_agent(j.get("name", "")),
+                "schedule": j.get("schedule_display", ""),
+                "status": "pending" if j.get("enabled", True) else "paused",
+                "state": j.get("state", "scheduled"),
+                "last_run": (j.get("last_run_at") or "")[:16],
+                "last_status": j.get("last_status", ""),
+                "enabled": j.get("enabled", True),
+                "next_run": (j.get("next_run_at") or "")[:16],
+            })
+        return result
+    except Exception:
+        return []
+
+
+def _guess_agent(name: str) -> str:
+    n = name.lower()
+    if "linkedin" in n or "sourcing" in n:
+        return "LinkedIn"
+    if "email" in n or "mail" in n:
+        return "Email"
+    if "post" in n or "publish" in n:
+        return "CONTENU"
+    return "Système"
+
+
+# ── SKILLS ─────────────────────────────────────────────────────────────────────
+def scan_skills() -> dict:
+    nodes, links = [], []
+    if not SKILLS_DIR.exists():
+        return {"nodes": nodes, "links": links}
+    for f in list(SKILLS_DIR.rglob("SKILL.md"))[:60]:
+        try:
+            rel = f.relative_to(SKILLS_DIR)
+            parts = rel.parts
+            node_id = str(rel.parent)
+            label = parts[-2] if len(parts) > 1 else parts[0]
+            nodes.append({"id": node_id, "label": label[:22], "group": parts[0]})
+            content = f.read_text(errors="ignore")
+            for m in re.finditer(r'\[\[([^\]]+)\]\]', content):
+                target = m.group(1).strip()
+                for n in nodes:
+                    if target.lower() in n["label"].lower() and n["id"] != node_id:
+                        links.append({"s": node_id, "t": n["id"]})
+        except Exception:
+            pass
+    return {"nodes": nodes, "links": links}
+
+
+def read_skill_content(skill_id: str) -> dict:
+    safe = skill_id.replace("..", "").strip("/")
+    for p in [SKILLS_DIR / safe / "SKILL.md", SKILLS_DIR / safe]:
+        if p.exists() and p.is_file():
+            return {"id": skill_id, "label": Path(safe).name, "content": p.read_text(errors="ignore")}
+    return {"id": skill_id, "label": skill_id, "content": ""}
+
+
+# ── TELEGRAM ───────────────────────────────────────────────────────────────────
+def send_to_queue(message: str, task_id=None) -> None:
+    try:
+        with open("/opt/data/dashboard_queue.txt", "a") as f:
+            f.write(message + "\n")
+    except Exception:
+        pass
+
+
+def send_via_telethon(message: str) -> bool:
+    try:
+        from telethon.sync import TelegramClient
+        from telethon.sessions import StringSession
+        api_id = int(_env("TELEGRAM_API_ID") or 0)
+        api_hash = _env("TELEGRAM_API_HASH")
+        session = _env("TELEGRAM_SESSION_STRING")
+        bot = _env("TELEGRAM_BOT_USERNAME")
+        if not all([api_id, api_hash, session, bot]):
+            raise ValueError("missing config")
+        with TelegramClient(StringSession(session), api_id, api_hash) as client:
+            client.send_message(bot, message)
         return True
     except Exception:
-        return False
+        token = _env("TELEGRAM_BOT_TOKEN")
+        chat_id = _env("TELEGRAM_CHAT_ID")
+        if not token or not chat_id:
+            return False
+        try:
+            payload = json.dumps({"chat_id": chat_id, "text": f"[Dashboard] {message}"}).encode()
+            req = urllib.request.Request(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                data=payload, headers={"Content-Type": "application/json"}, method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=5) as r:
+                return r.status == 200
+        except Exception:
+            return False
 
-class AutomationRequest(BaseModel):
-    task:    str
-    contact: Optional[str] = None
 
-@app.post("/api/automation/request", status_code=201)
-async def automation_request(req: AutomationRequest):
-    """A dashboard user asks whether a task can be automated.
-    Stored as a message the agent can read, logged to the activity feed, and emailed."""
-    body = req.task.strip()
-    if req.contact:
-        body += f"\n\nContact : {req.contact}"
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO messages (content, type, direction) VALUES (?,?,?)",
-        (body, 'automation', 'to_agent')
-    )
-    conn.execute(
-        "INSERT INTO logs (level, agent, message) VALUES (?,?,?)",
-        ('info', 'Dashboard', f"Demande d'automatisation : \"{req.task[:120]}\"")
-    )
-    conn.commit()
-    conn.close()
-    emailed = _send_email(
-        "Nouvelle demande d'automatisation — Dashboard",
-        body,
-        AUTOMATION_EMAIL,
-    )
-    return {"status": "received", "emailed": emailed, "to": AUTOMATION_EMAIL}
+# ── HANDLER ────────────────────────────────────────────────────────────────────
+class DashboardHandler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(ROOT_DIR), **kwargs)
 
-# ══════════════════════════════════════════════════════════════
-#  AGENT INTEGRATION HELPERS
-# ══════════════════════════════════════════════════════════════
-#
-#  Your agent should call these endpoints to push data to the dashboard.
-#
-#  QUICK REFERENCE — what to call and when:
-#
-#  Check the server is alive (and DB reachable):
-#    GET /api/health   ->  { "status": "ok", "time": ..., "logs": N, "pending_validations": N }
-#
-#  Every action taken:
-#    POST /api/logs
-#    { "level": "info", "agent": "LinkedIn", "message": "Connexion envoyée · Sophie Lambert" }
-#
-#  When an action needs user approval:
-#    POST /api/tasks
-#    { "title": "Publier ce post LinkedIn : …", "type": "li", "status": "pending_validation", "agent": "LinkedIn" }
-#
-#  When a task is completed:
-#    PUT /api/tasks/{id}   { "status": "done" }
-#
-#  When a future action is scheduled:
-#    POST /api/scheduled
-#    { "title": "Envoi campagne email", "agent": "Email", "scheduled_at": 1718000000.0 }
-#
-#  When a scheduled action executes:
-#    PUT /api/scheduled/{id}   { "status": "done" }
-#
-#  To record ROI (time saved, revenue generated):
-#    POST /api/roi
-#    { "label": "Réponse email automatique", "value_eur": 50, "hours": 0.5, "agent": "Email" }
-#
-#  To record a metric data point (for charts):
-#    POST /api/metrics
-#    { "agent": "LinkedIn", "key": "posts_published", "value": 1 }
-#
-#  To read messages/notes the user sent from the dashboard:
-#    GET /api/agent/messages?direction=to_agent
-#    (note: "cette tâche est-elle automatisable ?" requests arrive here with type="automation")
-#
-#  Automation requests from the "Demander si une tâche est automatisable" button:
-#    POST /api/automation/request  { "task": "...", "contact": "..." }
-#    -> stored as an agent message (type=automation), logged, and emailed to AUTOMATION_EMAIL.
-#    Configure outbound email with env vars: SMTP_HOST, SMTP_USER, SMTP_PASS,
-#    optional SMTP_PORT (587 STARTTLS / 465 SSL) and SMTP_FROM. Recipient defaults to
-#    benitez.noapro@gmail.com (override with AUTOMATION_EMAIL).
-#
-# ══════════════════════════════════════════════════════════════
+    def log_message(self, fmt, *args):
+        pass
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self._cors()
+        self.end_headers()
+
+    def _cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def send_json(self, payload, status=200):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _body(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        return json.loads(self.rfile.read(length) or b"{}")
+
+    def do_GET(self):
+        p = urlparse(self.path).path
+        qs = parse_qs(urlparse(self.path).query)
+
+        if p == "/api/health":
+            self.send_json({"status": "ok", "time": datetime.now(timezone.utc).timestamp()})
+        elif p == "/api/logs":
+            agent = qs.get("agent", [None])[0]
+            limit = int(qs.get("limit", ["100"])[0])
+            self.send_json({"logs": read_logs(limit=limit, agent=agent)})
+        elif p == "/api/tasks":
+            self.send_json({"tasks": read_tasks()})
+        elif p == "/api/roi":
+            self.send_json(read_roi())
+        elif p == "/api/pending":
+            self.send_json({"pending": read_pending()})
+        elif p in ("/api/scheduled", "/api/crons"):
+            self.send_json({"scheduled": read_scheduled(), "crons": read_scheduled()})
+        elif p == "/api/skills":
+            self.send_json(scan_skills())
+        elif p.startswith("/api/skills/"):
+            self.send_json(read_skill_content(p[len("/api/skills/"):]))
+        else:
+            super().do_GET()
+
+    def do_POST(self):
+        p = urlparse(self.path).path
+        try:
+            payload = self._body()
+        except Exception as e:
+            self.send_json({"error": str(e)}, 400)
+            return
+
+        if p == "/api/logs":
+            try:
+                log = add_log(
+                    level=str(payload.get("level", "info")),
+                    message=str(payload.get("message", "")),
+                    agent=str(payload.get("agent", "Système"))
+                )
+                self.send_json({"log": log}, 201)
+            except ValueError as e:
+                self.send_json({"error": str(e)}, 400)
+
+        elif p == "/api/tasks":
+            task = add_task(
+                title=str(payload.get("title", "")),
+                type_=str(payload.get("type", "li")),
+                status=str(payload.get("status", "todo"))
+            )
+            self.send_json({"task": task}, 201)
+
+        elif p == "/api/roi":
+            entry = add_roi(
+                task_name=str(payload.get("task_name", "tâche")),
+                duration_minutes=float(payload.get("duration_minutes", 0))
+            )
+            self.send_json(entry, 201)
+
+        elif p == "/api/pending":
+            action = add_pending(
+                agent=str(payload.get("agent", "Agent")),
+                action_type=str(payload.get("action_type", "action")),
+                title=str(payload.get("title", "")),
+                content=str(payload.get("content", "")),
+                meta=str(payload.get("meta", ""))
+            )
+            self.send_json({"action": action}, 201)
+
+        elif p in ("/api/telegram/send", "/api/agent/message"):
+            message = str(payload.get("message", ""))
+            task_id = payload.get("task_id")
+            send_to_queue(message, task_id)
+            sent = send_via_telethon(message)
+            self.send_json({"sent": sent})
+
+        elif p == "/api/agent/audio":
+            self.send_json({"received": True})
+
+        else:
+            self.send_json({"error": "not found"}, 404)
+
+    def do_PUT(self):
+        p = urlparse(self.path).path
+        try:
+            payload = self._body()
+        except Exception as e:
+            self.send_json({"error": str(e)}, 400)
+            return
+
+        m = re.match(r"^/api/tasks/(.+)$", p)
+        if m:
+            task = update_task(m.group(1), str(payload.get("status", "todo")))
+            self.send_json({"task": task} if task else {"error": "not found"})
+            return
+
+        m = re.match(r"^/api/pending/(\d+)$", p)
+        if m:
+            approved = payload.get("approved", False)
+            action = resolve_pending(int(m.group(1)), approved)
+            if action and approved:
+                send_via_telethon(f"✅ Approuvé : {action.get('title','')}")
+            self.send_json({"action": action} if action else {"error": "not found"})
+            return
+
+        self.send_json({"error": "not found"}, 404)
+
+    def do_DELETE(self):
+        p = urlparse(self.path).path
+        m = re.match(r"^/api/tasks/(.+)$", p)
+        if m:
+            delete_task(m.group(1))
+            self.send_json({"deleted": True})
+            return
+        self.send_json({"error": "not found"}, 404)
+
+
+def main():
+    init_db()
+    server = ThreadingHTTPServer((HOST, PORT), DashboardHandler)
+    print(f"Agent B dashboard → http://{HOST}:{PORT}")
+    server.serve_forever()
+
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    main()
